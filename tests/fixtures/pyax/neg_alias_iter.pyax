@@ -1,0 +1,7 @@
+# expect-error: neg_alias_iter.pyax:6:9:
+# expect-error: `xs` is updated inside a loop over `xs`
+def main(args: list[str]) -> int:
+    xs = [1, 2, 3]
+    for x in xs:
+        xs.append(x)
+    return len(xs)

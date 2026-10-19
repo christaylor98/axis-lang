@@ -1,0 +1,9 @@
+# expect-error: neg_continue.pyax:7:13:
+# expect-error: `continue` is not in PyAx
+def main(args: list[str]) -> int:
+    n = 0
+    for x in [1, 2, 3]:
+        if x == 2:
+            continue
+        n += x
+    return n

@@ -1,0 +1,16 @@
+# A comprehension reading a captured value, and a bounded while loop.
+def scaled(xs: list[int], k: int) -> list[int]:
+    return [x * k for x in xs if x > 1]
+
+
+def halvings(n: int) -> int:
+    steps = 0
+    while n > 1:
+        n = n // 2
+        steps += 1
+    return steps
+
+
+def main(args: list[str]) -> int:
+    print(scaled([1, 2, 3], 10))
+    return halvings(1000)

@@ -1,0 +1,7 @@
+# expect-error: argument 1 of `int_list_fold_int()` must be list[int]
+# a registry call with the wrong list type, caught at the line
+def add(a: int, b: int) -> int:
+    return a + b
+
+def main() -> None:
+    print(int_list_fold_int(["a"], 0, add))

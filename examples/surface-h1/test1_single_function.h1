@@ -1,7 +1,6 @@
-// Test 1: Single function returning literal
-// This tests: FnDecl, Block, Literal
+// Test 1: Single function returning typed literal
+// Expected: PASS
 
 fn main() {
-  1
+  Int(1)
 }
-

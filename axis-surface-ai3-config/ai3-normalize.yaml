@@ -1,0 +1,439 @@
+# AI3 Normalization Rules
+# Surface: surface-ai3
+# Target NF Version: 0.1
+# Version: 0.1
+#
+# AI3 = M1 + mandatory tail `return` + `;` statement separators.
+# Derived from axis-surface-m1-config/m1-normalize.yaml. M1 is NOT modified.
+#
+# Deltas from M1 (two rules added, two rule_order entries added, zero rules changed):
+#   1. strip_return_stmt   — erases the ReturnStmt node before NF.
+#   2. desugar_branch_body — folds the unshared if-branch body, identically to
+#      desugar_body (AI3_UNSHARE_BODY_V1).
+#
+# WHY THIS SURFACE MINTS NO NF NODE KIND.
+# `;` is punctuation: it is consumed by the grammar and never projected into a
+# field, so it cannot reach NF at all. `return` becomes a ReturnStmt node, and
+# strip_return_stmt erases it with `nf_node: "transparent"`, which dispatches to
+# unwrap_transparent_node (normalize_engine.rs:184-187) and returns the node held
+# in the `expr` field. Traversal is bottom_up (normalize_engine.rs:57-59 normalizes
+# children before the parent), so the ReturnStmt inside Body.result is already
+# replaced by its inner expression BEFORE fold_body_to_let_chain reads `result`.
+# The NF handed to lowering is therefore indistinguishable from M1's.
+#
+# rule_order is an EXPLICIT ordered list. A rule not named there DOES NOT RUN,
+# and a node with no matching rule is a HARD ERROR (normalize_engine.rs:70-79).
+
+version: "0.1"
+target_nf_version: "0.1"
+description: "AI3 normalization — M1 rules plus `return` elimination; minimal desugaring, close to NF by design"
+
+strategy:
+  application_order: "sequential"
+  traversal_order: "bottom_up"
+  default_behavior: "fail_loud"
+  failure_mode: "fail_loud"
+
+rule_order:
+  # Program structure
+  - "desugar_program"
+  - "desugar_item"
+  - "desugar_fn_decl"
+  # Body, return tail and let-bindings
+  - "desugar_body"
+  - "desugar_branch_body"      # AI3 DELTA — AI3_UNSHARE_BODY_V1
+  - "strip_return_stmt"        # AI3 DELTA
+  - "desugar_let_binding"
+  - "desugar_let_decl"
+  # Type param nodes (surface-only)
+  - "strip_typed_param_list"
+  - "strip_typed_param_rest"
+  - "strip_typed_param"
+  # Type expression nodes (surface-only)
+  - "strip_value_type_args"
+  - "strip_type_expr"
+  - "strip_value_type_expr"
+  - "strip_valuelist_type_expr"
+  - "strip_prim_type_expr"
+  - "strip_type_expr_rest"
+  # Core expression forms
+  - "normalize_determine_expr"
+  - "strip_else_block"         # AI3_ELSE_IF_V1
+  - "strip_else_tail"          # AI3_ELSE_IF_V1
+  - "desugar_if_expr"
+  - "desugar_value_construct"
+  - "desugar_valuelist_construct"
+  - "desugar_call_expr"
+  - "normalize_ident"
+  - "desugar_expr_variant"
+  # Literals
+  - "normalize_int_lit"
+  - "normalize_text_lit"
+  - "normalize_bool_lit"
+  - "normalize_unit_lit"
+  # Arg helpers
+  - "normalize_arg_list"
+  - "normalize_arg_list_rest"
+  - "normalize_empty"
+
+rules:
+
+  # ── PROGRAM STRUCTURE ─────────────────────────────────────────
+
+  desugar_program:
+    description: "Unwrap Program — single-item programs unwrap to the item; multi-item kept as Program{items}"
+    pattern:
+      node_kind: "Program"
+      fields:
+        items: { exists: true, is_list: true }
+    replacement:
+      nf_node: "unwrap_program_items"
+      nf_fields: "preserve_all"
+
+  desugar_item:
+    description: "Unwrap Item variant (FnDecl or LetDecl)"
+    pattern:
+      node_kind: "Item"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields: "preserve_all"
+
+  desugar_fn_decl:
+    description: "FnDecl — pass through; curried-lambda rewrite deferred to future engine"
+    pattern:
+      node_kind: "FnDecl"
+      fields:
+        name: { exists: true, is_token: true }
+        params: { exists: true, is_node: true }
+        body: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  # ── BODY, RETURN TAIL AND LET-BINDINGS ────────────────────────
+
+  desugar_body:
+    description: "Body → nested LetExpr (zero bindings → result Expr; n bindings → n nested LetExpr, innermost body = result)"
+    pattern:
+      node_kind: "Body"
+      fields:
+        result: { exists: true, is_node: true }
+    replacement:
+      nf_node: "fold_body_to_let_chain"
+      nf_fields: "preserve_all"
+
+  # AI3 DELTA — NEW RULE (AI3_UNSHARE_BODY_V1).
+  # BranchBody folds exactly as Body does, to the same nested LetExpr chain and
+  # to the bare result when there are zero bindings. `fold_body_to_let_chain`
+  # dispatches on the nf_node string, not on the source node kind, and reads
+  # `bindings`/`result` by name (normalize_engine.rs:286-350), so pointing a
+  # second rule at it mints nothing new: the NF output is a LetExpr chain or the
+  # result node, both of which M1 already produces from this exact shape.
+  desugar_branch_body:
+    description: "BranchBody → nested LetExpr (identical fold to Body; the if-branch tail is a bare Expr, as in M1)"
+    pattern:
+      node_kind: "BranchBody"
+      fields:
+        result: { exists: true, is_node: true }
+    replacement:
+      nf_node: "fold_body_to_let_chain"
+      nf_fields: "preserve_all"
+
+  # AI3 DELTA — NEW RULE.
+  # ReturnStmt{expr} → expr. The `return` keyword is surface discipline only and
+  # is gone before NF admissibility and before lowering; no NF node kind is minted.
+  # `transparent` finds the `expr` field by name — see the note on ReturnStmt in
+  # ai3-ast.yaml for why that field name is load-bearing.
+  strip_return_stmt:
+    description: "ReturnStmt → its expression. `return` is eliminated at normalization; it never reaches NF."
+    pattern:
+      node_kind: "ReturnStmt"
+      fields:
+        expr: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields: "preserve_all"
+
+  desugar_let_binding:
+    description: "LetBinding — preserve name and value"
+    pattern:
+      node_kind: "LetBinding"
+      fields:
+        name: { exists: true, is_token: true }
+        value: { exists: true, is_node: true }
+    replacement:
+      nf_node: "LetBinding"
+      nf_fields:
+        name: { from: "token:name" }
+        value: { from: "node:value" }
+
+  desugar_let_decl:
+    description: "Top-level LetDecl — pass through"
+    pattern:
+      node_kind: "LetDecl"
+      fields:
+        name: { exists: true, is_token: true }
+        value: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  # ── TYPED PARAMETER NODES (surface-only) ─────────────────────
+
+  strip_typed_param_list:
+    description: "TypedParamList — pass through for FnDecl"
+    pattern:
+      node_kind: "TypedParamList"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_typed_param_rest:
+    description: "TypedParamRest — pass through param child"
+    pattern:
+      node_kind: "TypedParamRest"
+      fields:
+        param: { exists: true, is_node: true }
+    replacement:
+      nf_node: "TypedParamRest"
+      nf_fields:
+        param: { from: "node:param" }
+
+  strip_typed_param:
+    description: "TypedParam — keep name and normalized type_expr for lowering"
+    pattern:
+      node_kind: "TypedParam"
+      fields:
+        name: { exists: true, is_token: true }
+        type_expr: { exists: true, is_node: true }
+    replacement:
+      nf_node: "TypedParam"
+      nf_fields:
+        name: { from: "token:name" }
+        type_expr: { from: "node:type_expr" }
+
+  # ── TYPE EXPRESSION NODES (surface-only) ─────────────────────
+
+  strip_value_type_args:
+    description: "ValueTypeArgs — pass through (type tags stripped at TypeExpr level)"
+    pattern:
+      node_kind: "ValueTypeArgs"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_type_expr:
+    description: "Strip TypeExpr wrapper — unwrap to inner type variant"
+    pattern:
+      node_kind: "TypeExpr"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields: "preserve_all"
+
+  strip_value_type_expr:
+    description: "ValueTypeExpr — pass through (compound type tag, surface-only)"
+    pattern:
+      node_kind: "ValueTypeExpr"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_valuelist_type_expr:
+    description: "ValueListTypeExpr — pass through (list type tag, surface-only)"
+    pattern:
+      node_kind: "ValueListTypeExpr"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_prim_type_expr:
+    description: "PrimTypeExpr — pass through (primitive type name, surface-only)"
+    pattern:
+      node_kind: "PrimTypeExpr"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_type_expr_rest:
+    description: "TypeExprRest — pass through (comma-separated type arg tail)"
+    pattern:
+      node_kind: "TypeExprRest"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  # ── CORE EXPRESSION DESUGARING ────────────────────────────────
+
+  normalize_determine_expr:
+    description: "DetermineExpr — identity (zero-operand determinacy gate)"
+    pattern:
+      node_kind: "DetermineExpr"
+    replacement:
+      nf_node: "DetermineExpr"
+      nf_fields: {}
+
+  strip_else_block:
+    description: "ElseBlock{body} → the (already folded) BranchBody. AI3_ELSE_IF_V1: no NF node kind is minted."
+    pattern:
+      node_kind: "ElseBlock"
+      fields:
+        body: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields: "preserve_all"
+  strip_else_tail:
+    description: "ElseTail{variant} → its ElseBlock body or its IfExpr: `else if` is exactly `else { if … }`."
+    pattern:
+      node_kind: "ElseTail"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields: "preserve_all"
+  desugar_if_expr:
+    description: "IfExpr → NF IfExpr (canonical branch names: then_branch/else_branch)"
+    pattern:
+      node_kind: "IfExpr"
+      fields:
+        condition: { exists: true, is_node: true }
+        then_branch: { exists: true, is_node: true }
+        else_branch: { exists: true, is_node: true }
+    replacement:
+      nf_node: "IfExpr"
+      nf_fields:
+        condition: { from: "node:condition" }
+        then_branch: { from: "node:then_branch" }
+        else_branch: { from: "node:else_branch" }
+
+  desugar_value_construct:
+    description: "ValueConstructExpr — pass through; type args are surface-only"
+    pattern:
+      node_kind: "ValueConstructExpr"
+      fields:
+        args: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  desugar_valuelist_construct:
+    description: "ValueListConstructExpr — pass through; element type is surface-only"
+    pattern:
+      node_kind: "ValueListConstructExpr"
+      fields:
+        args: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  desugar_call_expr:
+    description: "CallExpr → NF CallExpr with name token and ArgList node"
+    pattern:
+      node_kind: "CallExpr"
+      fields:
+        name: { exists: true, is_token: true }
+        args: { exists: true, is_node: true }
+    replacement:
+      nf_node: "CallExpr"
+      nf_fields:
+        name: { from: "token:name" }
+        args: { from: "node:args" }
+
+  normalize_ident:
+    description: "Bare IDENT variant in Expr → VarRef"
+    pattern:
+      node_kind: "Expr"
+      fields:
+        variant: { exists: true, is_token: true }
+    replacement:
+      nf_node: "VarRef"
+      nf_fields:
+        name: { from: "token:variant" }
+
+  desugar_expr_variant:
+    description: "Unwrap Expr variant (node case — must come after normalize_ident)"
+    pattern:
+      node_kind: "Expr"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields: "preserve_all"
+
+  # ── LITERALS ─────────────────────────────────────────────────
+
+  normalize_int_lit:
+    description: "IntLit — pass through with token value"
+    pattern:
+      node_kind: "IntLit"
+      fields:
+        value: { exists: true, is_token: true }
+    replacement:
+      nf_node: "IntLit"
+      nf_fields:
+        value: { from: "token:value" }
+
+  normalize_text_lit:
+    description: "TextLit — pass through with token value"
+    pattern:
+      node_kind: "TextLit"
+      fields:
+        value: { exists: true, is_token: true }
+    replacement:
+      nf_node: "TextLit"
+      nf_fields:
+        value: { from: "token:value" }
+
+  normalize_bool_lit:
+    description: "BoolLit — pass through with token value (KW_TRUE or KW_FALSE)"
+    pattern:
+      node_kind: "BoolLit"
+      fields:
+        value: { exists: true, is_token: true }
+    replacement:
+      nf_node: "BoolLit"
+      nf_fields:
+        value: { from: "token:value" }
+
+  normalize_unit_lit:
+    description: "UnitLit — pass through (no fields)"
+    pattern:
+      node_kind: "UnitLit"
+    replacement:
+      nf_node: "UnitLit"
+      nf_fields: {}
+
+  # ── ARG AND PARAM HELPERS ─────────────────────────────────────
+
+  normalize_arg_list:
+    description: "ArgList — preserve args list"
+    pattern:
+      node_kind: "ArgList"
+      fields:
+        args: { exists: true, is_list: true }
+    replacement:
+      nf_node: "ArgList"
+      nf_fields:
+        args: { from: "nodes:args" }
+
+  normalize_arg_list_rest:
+    description: "ArgListRest — pass through arg node"
+    pattern:
+      node_kind: "ArgListRest"
+      fields:
+        arg: { exists: true, is_node: true }
+    replacement:
+      nf_node: "ArgListRest"
+      nf_fields:
+        arg: { from: "node:arg" }
+
+  normalize_empty:
+    description: "Empty — identity (no-arg sentinels)"
+    pattern:
+      node_kind: "Empty"
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}

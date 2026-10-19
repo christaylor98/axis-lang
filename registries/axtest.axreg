@@ -1,0 +1,30 @@
+// Axis test framework registry.
+//
+// Identities: §5b bootstrap rule — SHA-256 of the UTF-8 function name bytes.
+//
+// BRIDGE HAND-OFF (BRIDGE_ENTRY_POINTS_V1):
+//   assert, assert_true, assert_false must be implemented as built-ins in the
+//   axis-codegen-bridge runtime. Each must panic (non-zero process exit) when
+//   the condition fails. Until the bridge ships this implementation, any test
+//   that calls these functions will fail at bridge build time with
+//   "unresolved CCall targets" — this is the Stage-0 FAIL signal.
+
+registry axtest 0.1
+
+// Bool: owned by axis-surface-m1-config/m1-registry.axreg, co-fed with this
+// file in every current invocation (scripts/run_tests.sh), so it is not
+// redeclared here. Unit has no such co-fed owner in that combo, so it stays.
+type Unit = prim unit
+
+// assert: panic if condition is false.
+// Runtime: bridge built-in — TODO BRIDGE_ENTRY_POINTS_V1.
+// §5b identity = SHA-256("assert")
+fn assert
+  identity 0x25450689bdd44d014020b238021b313431cb1f7a86f24e29cecbd1e442edae0a
+  kind leaf
+  in (Bool)
+  out Unit
+  effect pure
+  deterministic true
+  idempotent false
+end

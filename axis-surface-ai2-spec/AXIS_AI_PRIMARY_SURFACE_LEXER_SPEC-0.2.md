@@ -27,7 +27,7 @@ The lexer is part of the **semantic safety boundary**, not a convenience layer.
 
 ## 2. Design Premise
 
-Axis Language Lab operates as a **multi-stage pipeline**:
+Axis Lang operates as a **multi-stage pipeline**:
 
 ```
 Text

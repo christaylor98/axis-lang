@@ -1,10 +1,10 @@
 // Invariant-based validation for spec-driven lexer
 // These tests prove correctness properties that MUST hold for all inputs
 
-use axis_lang_lab::frontend::lexer_engine::lex_with_spec;
-use axis_lang_lab::frontend::lexspec::LexerSpec;
-use axis_lang_lab::frontend::lexspec_load::load_spec;
-use axis_lang_lab::frontend::token::{Token, TokenKind};
+use axis_lang::frontend::lexer_engine::lex_with_spec;
+use axis_lang::frontend::lexspec::LexerSpec;
+use axis_lang::frontend::lexspec_load::load_spec;
+use axis_lang::frontend::token::{Token, TokenKind};
 use std::path::PathBuf;
 
 /// Core invariant checker - MUST pass for all (spec, src, tokens) triples
@@ -444,7 +444,7 @@ fn garbage_input_edge_cases() {
 
 #[test]
 fn cli_consistency_same_code_path() {
-    use axis_lang_lab::native_lex::lex_str;
+    use axis_lang::native_lex::lex_str;
 
     let spec_path = PathBuf::from("tests/fixtures/wave6_basic.yaml");
     let spec = load_spec(&spec_path).unwrap();

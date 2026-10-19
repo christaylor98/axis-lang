@@ -1,0 +1,19 @@
+# expect-exit: 0
+# `del xs[i]` and `xs[i] += v` inside a loop body update xs, so xs travels through the loop's state. Both were missing
+# from the loop scan and failed with "`xs` is not defined here".
+def main() -> None:
+    xs = [1, 2, 3, 4, 5]
+    for i in range(2):
+        del xs[0]
+    ys = [0, 0]
+    for w in ["a", "a", "b"]:
+        ys[0] += 1
+    d = {"a": 1, "b": 2, "c": 3}
+    n = 0
+    while n < 2:
+        del d["a" if n == 0 else "c"]
+        n += 1
+    m = {"x": 10}
+    for k in ["x", "x"]:
+        m[k] -= 3
+    print(xs, ys, d, m)

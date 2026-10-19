@@ -1,0 +1,15 @@
+# expect-exit: 3
+# A failed assert inside a while loop ends the loop and the run (LOOPS_STOP_ON_UNKNOWN_V1). Before, the loop kept
+# going on the poisoned state up to its iteration cap; this one would spin through 10^9 iterations.
+def run(n: int) -> int:
+    i = 0
+    seen = 0
+    while i < n:
+        assert i < 3, "stop at " + str(i)
+        seen += 1
+        i += 1
+    return seen
+
+
+def main() -> int:
+    return run(1000000000)

@@ -1,0 +1,84 @@
+# AI3 Lexer Specification
+# Surface: surface-ai3
+# Version: 0.1
+#
+# AI3 = M1 + mandatory tail `return` + `;` statement separators.
+# Derived from axis-surface-m1-config/m1-lexer.yaml. M1 is NOT modified.
+#
+# Deltas from M1:
+#   1. keywords: + `return`
+#   2. punctuation: + `;`
+#
+# NEWLINE AS A SEPARATOR — how it actually works here.
+# Newline is NOT a token and cannot be made one from config: lexer_engine.rs:169-178
+# consumes any whitespace match unconditionally and never emits a token, ignoring
+# the `skip:` field entirely. Newline therefore functions as a statement separator
+# the same way it already does in M1 — statements juxtapose and the intervening
+# whitespace (newline included) is skipped. `;` adds an EXPLICIT optional separator
+# on top of that. Both forms are exercised by the ai3 fixtures.
+
+lexer:
+  charset: ascii
+  case_sensitive: true
+
+  whitespace:
+    pattern: "[ \\t\\n\\r]+"
+    skip: true
+
+  comments:
+    - pattern: "//[^\\n]*"
+      skip: true
+
+  # Keywords — must be matched before identifiers.
+  # lexer_engine.rs:327 matches the identifier regex first, then tests the lexeme
+  # against rules.keywords, so adding a keyword is ordering-safe.
+  keywords:
+    - fn
+    - let
+    - in
+    - if
+    - else
+    - true
+    - false
+    - Int
+    - Text
+    - Bool
+    - Unit
+    - Bytes
+    - Value
+    - ValueList
+    - determine
+    - return        # AI3 DELTA — mandatory tail of every Body
+
+  identifiers:
+    pattern: "[a-zA-Z_][a-zA-Z0-9_]*"
+    forbid:
+      - Int        # reserved — primitive type constructor
+      - Text       # reserved — primitive type constructor
+      - Bool       # reserved — primitive type constructor
+      - Unit       # reserved — primitive type constructor
+      - Bytes      # reserved — primitive type constructor (atomic blob, PrimCode::Bytes)
+      - Value      # reserved — compound type constructor keyword
+      - ValueList  # reserved — list constructor keyword
+
+  literals:
+    int:
+      pattern: "[0-9]+"
+      base: 10
+    string:
+      delimiter: "\""
+      escapes: ["\\\"", "\\\\", "\\n", "\\t"]
+      forbid_newlines: true
+
+  punctuation:
+    - "("
+    - ")"
+    - "{"
+    - "}"
+    - "["
+    - "]"
+    - ","
+    - ":"
+    - "->"
+    - "="
+    - ";"        # AI3 DELTA — explicit statement separator

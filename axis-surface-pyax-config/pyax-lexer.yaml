@@ -1,0 +1,137 @@
+# PyAx Lexer Specification
+# Surface: surface-pyax (PYAX_SURFACE_EXPAND_V1)
+# Version: 0.1
+#
+# PyAx is Python-like, not Python: typed `def`s, indentation blocks, Python
+# operators and builtins. Constructs models rarely write and that cost the most
+# to support are dropped (break/continue, lambda, nested def, map/filter,
+# float, truthiness) — see PYAX_SURFACE_EXPAND_V1.report.md.
+#
+# LAYOUT. `layout: offside` (lexer_engine.rs apply_layout) emits zero-width
+# NEWLINE / INDENT / DEDENT punctuation after ordinary lexing; inside an open
+# bracket lines join. The grammar refers to them as <PUNCT_NEWLINE> etc.
+#
+
+lexer:
+  charset: ascii
+  case_sensitive: true
+
+  whitespace:
+    pattern: "[ \\t\\r\\n]+"
+    skip: true
+
+  comments:
+    - pattern: "#[^\\n]*"
+      skip: true
+
+  # Keywords include constructs PyAx does not have (yet or ever), so that they
+  # stop the parse at the keyword instead of being read as names.
+  keywords:
+    - def
+    - return
+    - if
+    - elif
+    - else
+    - and
+    - or
+    - not
+    - in
+    - pass
+    - True
+    - False
+    - None
+    - for
+    - while
+    - break
+    - continue
+    - lambda
+    - class
+    - import
+    - from
+    - global
+    - nonlocal
+    - try
+    - except
+    - finally
+    - raise
+    - with
+    - yield
+    - del
+    - assert
+    - is
+    - async
+    - await
+
+  identifiers:
+    pattern: "[A-Za-z_][A-Za-z0-9_]*"
+
+  literals:
+    # 1.5, 2.0e-3, 1e9 — tried before int (lexer_engine), so `1.5` is one token.
+    float:
+      pattern: "[0-9]+\\.[0-9]+([eE][-+]?[0-9]+)?|[0-9]+[eE][-+]?[0-9]+"
+    int:
+      pattern: "[0-9]+"
+      base: 10
+    string:
+      delimiter: "\""
+      escapes: ["\\\"", "\\\\", "\\n", "\\t"]
+      forbid_newlines: true
+      # 'single quotes' are re-written in the double-quoted form at lex time.
+      alternate_delimiters: ["'"]
+      # """docstrings""" and '''blocks''': may span lines (newlines become \\n)
+      multiline_delimiters: ['"""', "'''"]
+      # f"text{expr}" -> FSTR_BEGIN "text" FSTR_OPEN <expr tokens> FSTR_CLOSE FSTR_END
+      interpolation:
+        prefixes: [f]
+        begin: FSTR_BEGIN
+        end: FSTR_END
+        open: FSTR_OPEN
+        close: FSTR_CLOSE
+
+  # Longest match wins (lexer_engine sorts by length).
+  punctuation:
+    - "**"
+    - "<<="
+    - ">>="
+    - "&="
+    - "^="
+    - "<<"
+    - ">>"
+    - "&"
+    - "^"
+    - "~"
+    - "//="
+    - "|="
+    - "/="
+    - "+="
+    - "-="
+    - "*="
+    - "%="
+    - "->"
+    - "=="
+    - "!="
+    - "<="
+    - ">="
+    - "//"
+    - "/"
+    - "("
+    - ")"
+    - "["
+    - "]"
+    - "{"
+    - "}"
+    - ","
+    - ":"
+    - "."
+    - "="
+    - "+"
+    - "-"
+    - "*"
+    - "%"
+    - "|"
+    - "<"
+    - ">"
+
+  layout:
+    mode: offside
+    brackets: [["(", ")"], ["[", "]"], ["{", "}"]]

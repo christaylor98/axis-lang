@@ -1,0 +1,9 @@
+// AI3 fixture: if tail. `return` in the outer FUNCTION body, and a BARE
+// expression at each branch tail.
+// AI3_UNSHARE_BODY_V1: Body (FnDecl) requires `return`; BranchBody (IfExpr) does
+// not admit it. The branch tails below are M1's, unchanged.
+// Byte-identity anchor t4_if — must equal the M1 bundle for
+//   fn t4(n: Int) -> Int { if int_lt(n, Int(0)) { int_sub(Int(0), n) } else { n } }
+fn t4(n: Int) -> Int {
+  return if int_lt(n, Int(0)) { int_sub(Int(0), n) } else { n };
+}

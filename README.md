@@ -1,149 +1,296 @@
-# Axis Language Lab
+# Axis Lang
 
-**A deterministic, spec-driven compiler that lowers source code into a small, frozen, canonical intermediate representation — Axis Core IR.**
+**A compiler construction laboratory for the Axis programming language.**
 
-Axis Language Lab exists to make **program meaning explicit, inspectable, and stable** — independent of surface syntax, runtime, or execution strategy. Source goes in; a canonical Core IR bundle comes out. The same source and specifications always produce byte-identical IR.
-
-Execution is treated as a *projection* of meaning, not its source.
+Axis Lang is a deterministic, spec-driven compiler pipeline that transforms Axis source code into canonical Core IR bundles. It serves as a testbed for semantic design decisions and provides a reference implementation for how surface language constructs are given meaning through mechanical lowering.
 
 ---
 
-## Why this exists
+## What This Is
 
-Most systems tangle three things together: the surface language, the meaning of a program, and how it runs. Axis separates them hard.
+Axis Lang converts Axis source code through a multi-stage pipeline:
 
-- A **spec-driven front end** (lexer, parser, schema, normalisation — all YAML-configured) turns surface syntax into a single canonical structural form.
-- **Mechanical lowering** (fixed Rust, no configuration) assigns meaning, producing **Axis Core IR**: a closed set of nine node kinds and nothing else.
-- **Bridges** project Core IR into executable or target-specific forms. Execution lives here, downstream of meaning.
+1. **Lexer** — tokenizes source text according to a lexer specification
+2. **Parser** — builds a generic parse tree from grammar rules
+3. **Schema AST** — projects the parse tree into a typed abstract syntax tree
+4. **Normalisation** — converts surface AST into Normal Form (NF), removing surface sugar
+5. **Mechanical Lowering** — assigns semantics by transforming NF AST into Core IR (fixed, embedded, 100% Rust code)
 
-The payoff of a *small, closed* IR is that meaning becomes **analysable**. Because Core IR has exactly nine node kinds and routes all domain values through opaque foreign calls, you can mechanically reason about the structure of a program — what depends on what, what reaches a decision, what reaches an effect — in ways that are intractable over a general-purpose language. (See [Analysing Core IR](#analysing-core-ir).)
+Language Lab **stops at Core IR**. Execution, code generation, and other backends are handled by optional **bridges** that consume Core IR.
 
----
-
-## Conceptual layout
-
-```
-Surface Language(s)
-        │
-        ▼
-   IR Compiler            (spec-driven: lexer → parser → schema → normalisation)
-        │
-        ▼
-   Axis Core IR  0.3      (closed 9-node set; canonical, frozen contract)
-        │
-        ▼
-     Bridge(s)            (Rust bridge: compile to native; execution as projection)
-```
+The system is **deterministic**: the same source and specifications always produce identical Core IR. This ensures reproducibility and enables sealed builds where all specifications are embedded at compile time.
 
 ---
 
-## Core IR 0.3
+## What This Is NOT
 
-Core IR is a small lambda-calculus IR with a **closed, frozen** set of nine node kinds:
+Axis Lang explicitly does **not** provide:
 
-| Node | Purpose |
-|------|---------|
-| `cIntLit`, `cBoolLit`, `cUnitLit` | The only literals — enough to drive control flow |
-| `cVar`, `cLam`, `cApp` | Variable reference, abstraction, application |
-| `cLet` | Binding (and the mechanism for sequencing) |
-| `cIf` | Conditional branching |
-| `cCall` | External call to a foreign function, by bare canonical name |
+- Runtime execution or interpreters
+- Virtual machines or execution engines
+- Code generation or native compilation
+- Production-grade performance or optimization
+- Multiple compilation targets or backends
+- Tooling integration (LSP, debuggers, IDE support)
+- Multi-file project management or build systems
+- Security hardening or sandboxing
+- Concurrency or async execution
+- Dynamic language features
 
-Two design choices make the IR both tiny and universal:
-
-- **Everything beyond control flow is a foreign value.** Strings, lists, documents, handles — none exist *in* the IR. They are obtained, transformed, and consumed through `cCall` as opaque values the IR routes but never inspects. This is why nine nodes suffice for any domain.
-- **Annotations are side-band and non-authoritative.** A bundle must remain valid and execute identically if every annotation is removed. Metadata never affects semantics.
-
-The canonical form is the Cap'n Proto schema in [`core_ir_spec/`](core_ir_spec/). Adding a node kind is a major-version change — the node set is frozen by contract.
+These are intentionally out of scope. Language Lab is a **frontend only** — it stops at Core IR. The lab focuses exclusively on semantic authority and canonical lowering behavior.
 
 ---
 
-## Quick start
+## Current Maturity
+
+**Status: Experimental reference implementation**
+
+What works:
+- ✅ Spec-driven lexer, parser, and schema projection
+- ✅ YAML-driven normalization (mandatory, total, validates NF)
+- ✅ Deterministic mechanical lowering to Core IR (NF-only, embedded)
+- ✅ Sealed builds with embedded specifications
+- ✅ Annotation support (metadata only)
+- ✅ Full pipeline observability and inspection
+
+What is experimental:
+- The language design itself is evolving
+- Error messages are functional but minimal
+- Performance is not optimized
+- The API surface may change
+
+This is a laboratory, not a production tool.
+
+---
+
+## Quick Start
 
 ### Prerequisites
 
-- **Rust** 1.70+
-- **Git**
+- **Rust:** 1.70 or later
+- **Git:** Any recent version
 
-### Build
+### Clone and Build
 
 ```bash
-git clone https://github.com/christaylor98/axis-lang-lab.git
-cd axis-lang-lab
+git clone https://github.com/christaylor98/axis-lang.git
+cd axis-lang
 cargo build --release
 ```
 
-### Emit your first Core IR bundle
+### Emit Your First Core IR Bundle
 
 ```bash
-./target/release/axis \
-  --lexer     axis-surface-ai2-config/ai2-explicit-lexer.yaml \
-  --parser    axis-surface-ai2-config/ai2-explicit-parse.yaml \
-  --schema    axis-surface-ai2-config/ai2-explicit-ast.yaml \
-  --normalize axis-surface-ai2-config/ai2-explicit-normalize.yaml \
-  --src       examples/ai2/ai2-simple-int.ai2 \
-  --reg       axis-surface-ai2-config/ai2-explicit-registry.axreg \
-  --inspect   core-ir
+# Compile source to Core IR
+./target/release/axis run \
+  --lexer lang-lab-poc-userfiles/lexer.yaml \
+  --parser lang-lab-poc-userfiles/parsing.yaml \
+  --schema lang-lab-poc-userfiles/ast_schema.yaml \
+  --normalisation lang-lab-poc-userfiles/normalisation.yaml \
+  --file samples/pipeline_test.ax \
+  --inspect core-ir
+
+# Output: Core IR structure (YAML)
 ```
 
-This runs the full pipeline — source → tokens → parse tree → typed AST → Normal Form → Core IR — and prints the emitted IR.
+This runs the complete Language Lab pipeline from source to Core IR emission, using specification files that define the language syntax and lowering semantics.
 
 ---
 
-## The pipeline
+## Pipeline Overview
 
-1. **Lexer** — tokenises source per `lexer.yaml`.
-2. **Parser** — builds a generic parse tree per `parsing.yaml`.
-3. **Schema AST** — projects the parse tree into a typed AST per `ast_schema.yaml`.
-4. **Normalisation** — converts surface AST into Normal Form, removing sugar (`normalisation.yaml`). Mandatory and total; makes structure explicit without assigning meaning.
-5. **Mechanical lowering** — fixed Rust (`src/lowering/`), no config. Consumes Normal Form only, assigns semantics by 1:1 mapping, resolves registry bindings, emits canonical Core IR. **This is the sole semantic authority.**
+### Lexer → Tokens
 
-Lowering is deterministic and total. Before it, programs have structure but no meaning; after it, meaning is frozen in Core IR. **Language Lab stops at Core IR** — execution is a bridge's job.
+The lexer specification (`lexer.yaml`) defines:
+- Token types (keywords, identifiers, literals, punctuation)
+- Whitespace and comment handling
+- String escape sequences
+- Numeric literal formats
+
+The lexer consumes source text and produces a stream of tokens with span information.
+
+### Parser → Parse Tree
+
+The parser specification (`parsing.yaml`) defines:
+- Grammar rules (which tokens combine into which constructs)
+- Start symbol
+- Precedence and associativity (implicit in rule ordering)
+
+The parser consumes tokens and produces a generic parse tree.
+
+### Schema AST → Typed AST
+
+The schema specification (`ast_schema.yaml`) defines:
+- AST node types and their fields
+- Which fields are single values vs. lists
+- Union types for expressions
+- Annotation extraction rules
+
+Schema projection converts the untyped parse tree into a structured, typed AST.
+
+### Normalisation → Normal Form (NF)
+
+The normalisation specification (`normalisation.yaml`) defines:
+- Surface sugar removal rules
+- Control flow expansion
+- Structural transformations to Normal Form
+
+Normalisation is **mandatory** and ensures that lowering receives a single canonical structural shape. Normalisation does not assign semantics — it only makes structure explicit.
+
+### Mechanical Lowering → Core IR
+
+Lowering is **fixed, mechanical, and embedded** in the compiler (100% Rust code in `src/lowering/`).
+
+**There is no lowering.yaml configuration file.**
+
+Lowering:
+- Consumes **Normal Form (NF) AST only** (enforced by `NfAst` type boundary)
+- Assigns semantics through 1:1 mechanical mapping
+- Resolves registry bindings
+- Emits canonical Core IR 0.2
+- Is deterministic and total
+- Performs zero rewrites (all sugar eliminated by normalization)
+- Performs zero validation (already done by NF validation)
+
+Lowering is the **sole semantic authority**. Before lowering, programs have structure but no meaning. After lowering, semantics are frozen in Core IR.
+
+**Language Lab stops here.** Core IR is the output boundary.
 
 ---
 
-## Observability
+## Pipeline Observability & Inspection
 
-Every stage is inspectable with `--inspect <stage>`, emitting deterministic, machine-readable YAML:
+Axis Lang provides **full observability** at every pipeline stage, enabling language authors to see exactly what the compiler sees without guessing or inference.
 
-`lexer` · `grammar` · `cst` · `schema` · `ast` · `nf` · `registry` · `core-ir` · `pipeline` · `all`
+### Inspection Mode
 
-If a stage shows something unexpected, it is because the spec was written that way — not because the compiler inferred something silently. There is no guessing.
+Use the `--inspect` flag to dump the internal state of any pipeline stage:
+
+```bash
+# Inspect lexer rules
+./target/release/axis run \
+  --lexer lang-lab-poc-userfiles/lexer.yaml \
+  --parser lang-lab-poc-userfiles/parsing.yaml \
+  --schema lang-lab-poc-userfiles/ast_schema.yaml \
+  --normalisation lang-lab-poc-userfiles/normalisation.yaml \
+  --file samples/pipeline_test.ax \
+  --inspect lexer
+
+# Inspect loaded grammar
+./target/release/axis run \
+  --lexer lang-lab-poc-userfiles/lexer.yaml \
+  --parser lang-lab-poc-userfiles/parsing.yaml \
+  --schema lang-lab-poc-userfiles/ast_schema.yaml \
+  --normalisation lang-lab-poc-userfiles/normalisation.yaml \
+  --file samples/pipeline_test.ax \
+  --inspect grammar
+
+# Inspect multiple stages at once
+./target/release/axis run \
+  --lexer lang-lab-poc-userfiles/lexer.yaml \
+  --parser lang-lab-poc-userfiles/parsing.yaml \
+  --schema lang-lab-poc-userfiles/ast_schema.yaml \
+  --normalisation lang-lab-poc-userfiles/normalisation.yaml \
+  --file samples/pipeline_test.ax \
+  --inspect lexer --inspect schema --inspect pipeline
+
+# Inspect all stages
+./target/release/axis run \
+  --lexer lang-lab-poc-userfiles/lexer.yaml \
+  --parser lang-lab-poc-userfiles/parsing.yaml \
+  --schema lang-lab-poc-userfiles/ast_schema.yaml \
+  --normalisation lang-lab-poc-userfiles/normalisation.yaml \
+  --file samples/pipeline_test.ax \
+  --inspect all
+```
+
+### Available Inspection Stages
+
+| Stage | Description |
+|-------|-------------|
+| `lexer` | Ordered lexer rules with patterns and skip flags |
+| `grammar` | Resolved grammar with all nonterminals and productions |
+| `cst` | Concrete syntax tree with token spans and values |
+| `schema` | Schema nodes with fields and types |
+| `ast` | Abstract syntax tree after schema projection |
+| `nf` | Normal Form AST after normalization and validation |
+| `registry` | All registered operations with arity and profiles |
+| `core-ir` | Core IR structure after lowering |
+| `pipeline` | Pipeline execution summary with timings |
+| `all` | Enable all inspection stages |
+
+### Output Format
+
+All inspection output is deterministic and machine-readable (YAML). This enables:
+- **Debugging:** See exactly what the compiler loaded from YAML specs
+- **Validation:** Confirm grammar rules expanded correctly
+- **Tracing:** Track how source maps to AST to Core IR
+- **Documentation:** Generate reference materials from actual compiler state
+
+### No Guessing Mode
+
+Inspection provides **concrete, inspectable representations** of every loaded spec. If a stage shows unexpected results, it's because the spec was written that way - not because the compiler inferred something silently.
+
+Example inspection output:
+
+```yaml
+lexer:
+  rules:
+    - index: 0
+      name: FN
+      pattern: "fn"
+      skip: false
+    - index: 1
+      name: IDENT
+      pattern: "[A-Za-z_][A-Za-z0-9_]*"
+      skip: false
+```
 
 ---
 
-## Bridges
+## Documentation
 
-Core IR is consumed by **bridges**, which project it into executable form. The reference **Rust bridge** ([`rust-bridge/`](rust-bridge/)) compiles a Core IR bundle into a native library/executable: each `cCall` becomes an `extern "C"` symbol that the linker resolves against shim libraries. Library-first linking; consumers treat call targets as opaque ABI symbols and never load registries.
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Authoritative architectural specification
+- **[Getting Started](docs/GETTING_STARTED.md)** — Step-by-step tutorial with runnable examples
+- **[User Guide](docs/USER_GUIDE.md)** — How to use Axis Lang as a language author
 
-The same Core IR can be projected by multiple bridges with identical observable behaviour — execution strategy is decoupled from meaning.
-
----
-
-## Analysing Core IR
-
-A closed nine-node IR is not just executable — it is **statically analysable** in ways a general-purpose language is not. Because control flow is explicit and all domain operations are opaque named calls, you can mechanically trace how values flow through a program.
-
-[`tools/audit/`](tools/audit/) contains a worked example: a **load-bearing dataflow checker** that, given a Core IR bundle, validates its structure and then traces whether the output of any chosen call reaches a branch condition or a consequential effect — distinguishing calls that *drive decisions* from calls that are *side effects*. This kind of decidable structural analysis is exactly what the closed IR enables and what an unrestricted language cannot offer soundly. See [`tools/audit/README.md`](tools/audit/README.md).
+**Normative Specifications:**
+- **[Core IR 0.2](core_ir_spec/axis-core-ir-0.2.md)** — Core IR canonical specification
+- **[Normal Form 0.1](core_spec/NORMAL_FORM_SPEC_0.1.yaml)** — NF target specification
+- **[Registry 0.1](core_spec/axis-registry-0.1.md)** — Registry semantic specification
 
 ---
 
-## Status
+## Sealed Builds
 
-**Early, exploratory reference implementation.** Pre-1.0; the model is stable enough to build on but may evolve.
+Axis Lang supports **sealed builds** where all specifications are embedded into the binary at compile time. This eliminates runtime configuration and ensures complete determinism.
 
-Works today:
-- Spec-driven lexer, parser, schema projection
-- YAML-driven normalisation (mandatory, total, NF-validated)
-- Deterministic mechanical lowering to Core IR 0.3
-- Sealed builds with embedded specifications
-- Full pipeline observability
-- Rust bridge: Core IR → native executable, end to end
+```bash
+# Build sealed binary
+cargo build --release --features sealed
 
-Explicitly out of scope: runtime/VM in the lab itself, optimisation, LSP/IDE tooling, multi-file project management, sandboxing, async. Language Lab is a **front end** — it stops at Core IR.
+# Run without spec paths
+./target/release/axis run samples/pipeline_test.ax
+```
+
+Sealed builds are distribution-ready: they contain everything needed to reproduce identical Core IR from the same source.
+
+See the User Guide for details on when to use sealed vs. unsealed builds.
+
+---
+
+## Contributing
+
+This is a working laboratory. Code is structured for clarity and correctness, not performance.
+
+If you find behavior that violates the stated contracts or produces non-deterministic results, please open an issue with:
+- The exact command you ran
+- The spec files used
+- The source file that triggered the issue
+- Expected vs. actual output
 
 ---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+See [LICENSE](LICENSE) for details.

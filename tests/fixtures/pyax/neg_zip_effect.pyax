@@ -1,0 +1,9 @@
+# expect-error: binding it to a name for the loop would change when that call runs
+# a comprehension's zip argument that calls a function
+def f(n: int) -> list[int]:
+    print("f called")
+    return [n, n]
+
+def main() -> None:
+    xs = [1, 2]
+    print("a", [a + b for a, b in zip(xs, f(7))])

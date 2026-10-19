@@ -1,0 +1,6 @@
+# expect-error: is a loop variable
+# a loop variable read after its loop
+def main() -> None:
+    for i in range(3):
+        pass
+    print(i)

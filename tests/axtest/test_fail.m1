@@ -1,0 +1,9 @@
+// Stage-0 test: FAIL
+// This test always fails — assert(Bool(false)) must not pass.
+// Stage-0: fails at bridge build step ("unresolved CCall targets: assert")
+//   because the assert runtime is not yet implemented in the bridge.
+// Stage-1: compiles, runs, assert panics on Bool(false), exe exits non-zero.
+// Either stage, the runner correctly reports FAIL.
+fn test_fail() -> Unit {
+  assert(Bool(false))
+}

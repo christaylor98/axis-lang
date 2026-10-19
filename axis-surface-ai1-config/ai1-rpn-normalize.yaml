@@ -22,6 +22,8 @@ metadata:
 # Normalization strategy: AI1 produces expression trees via postfix reduction,
 # so normalization is primarily identity mappings with field restructuring.
 rule_order:
+  - normalize_program
+  - normalize_item
   - normalize_int_lit
   - normalize_bool_lit
   - normalize_unit_lit
@@ -32,6 +34,32 @@ rule_order:
   - normalize_app_expr
 
 rules:
+  # Item: transparent wrapper around reduced expression — unwrap variant
+  normalize_item:
+    description: "Unwrap Item wrapper to its inner expression"
+    pattern:
+      node_kind: "Item"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields:
+        variant: { from: "node:variant", recurse: true }
+    constraints: []
+
+  # Program: root node from parser — unwrap to single reduced expression
+  normalize_program:
+    description: "Unwrap Program to its single reduced expression"
+    pattern:
+      node_kind: "Program"
+      fields:
+        items: { exists: true, is_list: true }
+    replacement:
+      nf_node: "unwrap_program_items"
+      nf_fields: {}
+    constraints:
+      - "Program must contain exactly one reduced expression"
+
   # Integer literal: IntLit(token:INT_LIT) → NfIntLit(value:INT_LIT)
   normalize_int_lit:
     description: "Map IntLit CST node to NF IntLit"

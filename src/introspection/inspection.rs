@@ -14,9 +14,9 @@ use crate::frontend::parserspec_load;
 use crate::frontend::schema_ast;
 use crate::frontend::schema_load;
 use crate::frontend::token::Span;
-use crate::lowering::spec_driven;
 use crate::pipeline::{PipelineConfig, PipelineError};
-use crate::registry::Registry;
+use crate::registry::core05::fold::Scope;
+use crate::registry::core05::record::{EffectClass, FnKind};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::fs;
@@ -77,15 +77,28 @@ pub fn run_inspection(cfg: &PipelineConfig, stages: HashSet<String>) -> Result<(
         dump_schema_inspection(&ast_schema);
     }
 
-    // STAGE 3: Use registry from config (already loaded by CLI)
+    // STAGE 3: Registry — the Core IR 0.5 scope the CLI built from `--reg`.
+    //
+    // This used to call `Registry::load_active()`, which consults neither
+    // `--reg` nor `cfg`: with no langlab config on disk it falls back to
+    // `registries/wave3_test.axreg`, a legacy 0.1 projection (`function det0` /
+    // `arity 0`) the current parser rejects at line 3. Worse, the call sat
+    // OUTSIDE the stage filter, so it failed before ANY stage could be dumped —
+    // `--inspect lexer` died on a registry parse error while the very same
+    // `--reg` flags compiled the same file cleanly without `--inspect`.
+    //
+    // `main.rs` passes `registry: Registry::new()` (empty) and puts the real
+    // vocabulary in `core05_scope`; the 0.1 loader has not been the registry
+    // path since Phase 5. Reading the scope is free, so there is nothing to
+    // time or fail here — the stage stays in the timing table for shape.
     let stage_start = std::time::Instant::now();
-    let registry = cfg.registry.clone();
+    let registry_scope = cfg.core05_scope.as_ref();
     let registry_load_time = stage_start.elapsed();
     stage_timings.push(("registry_load".to_string(), registry_load_time));
     executed_stages.push("registry_load".to_string());
 
     if stages.contains("registry") {
-        dump_registry_inspection(&registry);
+        dump_registry_inspection(registry_scope);
     }
 
     // STAGE 4: Load source file
@@ -179,53 +192,59 @@ pub fn run_inspection(cfg: &PipelineConfig, stages: HashSet<String>) -> Result<(
             span: crate::frontend::token::Span::new(0, 0),
         })?;
 
-    let nf_ast = normalization_ctx
-        .normalize(schema_ast_node)
-        .map_err(|e| match e {
-            crate::normalize::NormalizationError::ValidationError(v) => {
-                PipelineError::NfValidation {
-                    message: v.message.clone(),
-                    span: v.span,
+    // Split `Program` into its items BEFORE normalizing, exactly as
+    // `run_pipeline` does. `Program` is a forbidden node kind: the normalizer
+    // rejects it outright ("Program with N items reached normalizer — pipeline
+    // must split before normalization"), so without this split `--inspect` on
+    // any file with more than one top-level declaration died at normalization
+    // even though the same file compiles. The registry bug above hid this one:
+    // stage 3 failed first, so no inspection ever reached the normalizer.
+    let raw_items: Vec<schema_ast::SchemaAstNode> = if schema_ast_node.kind == "Program" {
+        match schema_ast_node.fields.get("items") {
+            Some(schema_ast::SchemaValue::Nodes(ns)) => ns.clone(),
+            _ => vec![schema_ast_node],
+        }
+    } else {
+        vec![schema_ast_node]
+    };
+
+    let nf_asts = raw_items
+        .into_iter()
+        .map(|item| {
+            normalization_ctx.normalize(item).map_err(|e| match e {
+                crate::normalize::NormalizationError::ValidationError(v) => {
+                    PipelineError::NfValidation {
+                        message: v.message.clone(),
+                        span: v.span,
+                    }
                 }
-            }
-            _ => PipelineError::Normalization {
-                message: format!("{}", e),
-                span: crate::frontend::token::Span::new(0, 0),
-            },
-        })?;
+                _ => PipelineError::Normalization {
+                    message: format!("{}", e),
+                    span: crate::frontend::token::Span::new(0, 0),
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     let normalisation_time = stage_start.elapsed();
     stage_timings.push(("normalisation".to_string(), normalisation_time));
     executed_stages.push("normalisation".to_string());
 
     if stages.contains("normalisation") || stages.contains("nf") {
         eprintln!("=== NORMALIZATION ===");
-        eprintln!("NF version: {}", nf_ast.nf_version());
-        eprintln!("Root node: {}", nf_ast.node().kind);
+        eprintln!("Items: {}", nf_asts.len());
+        for (i, nf_ast) in nf_asts.iter().enumerate() {
+            eprintln!("  [{}] NF version: {}", i, nf_ast.nf_version());
+            eprintln!("  [{}] Root node: {}", i, nf_ast.node().kind);
+        }
     }
 
-    // STAGE 9: Lower to Core IR (mechanical lowering)
-    let stage_start = std::time::Instant::now();
-    let core_ir = crate::lowering::nf_lowering::lower_nf_to_bundle(nf_ast.node(), registry)
-        .map_err(|e| PipelineError::Lower {
-            message: e.message,
-            span: e.span,
-        })?;
-    let lowering_time = stage_start.elapsed();
-    stage_timings.push(("lowering".to_string(), lowering_time));
-    executed_stages.push("lowering".to_string());
-
+    // NOTE: Legacy Core IR 0.3 lowering stage retired in Phase 3d.
+    // The 0.5 lowering path is wired separately. The inspection stages
+    // for "core-ir" and "code_trace" that depended on the 0.3 bundle
+    // are omitted here.
     if stages.contains("lowering") {
         eprintln!("=== LOWERING ===");
-        eprintln!("Mechanical lowering: NfAst -> CoreIR");
-    }
-
-    if stages.contains("core-ir") {
-        dump_core_ir_inspection(&core_ir);
-    }
-
-    // WAVE T1: Code trace inspection
-    if stages.contains("code_trace") {
-        dump_code_trace_inspection(&tokens, &parse_tree, nf_ast.node(), &core_ir)?;
+        eprintln!("Legacy Core IR 0.3 lowering retired (Phase 3d). Use 0.5 path.");
     }
 
     // Pipeline summary
@@ -584,165 +603,112 @@ fn dump_ast_inspection(ast: &crate::frontend::schema_ast::SchemaAstNode) {
     println!("{}", yaml);
 }
 
-fn dump_registry_inspection(registry: &Registry) {
+fn dump_registry_inspection(scope: Option<&Scope>) {
     println!("═══════════════════════════════════════════════════════════");
     println!("REGISTRY INSPECTION");
     println!("═══════════════════════════════════════════════════════════");
     println!();
 
     #[derive(Serialize)]
-    struct RegistryOp {
+    struct RegistryFn {
         name: String,
-        arity: usize,
-        deterministic: bool,
-        profiles: Vec<String>,
-        id: u64,
+        identity: String,
+        kind: String,
+        inputs: Vec<String>,
+        output: String,
+        effect: String,
+        variadic: bool,
+        /// One entry per `callback <pos> (<in>) -> <out>` the fn declares.
+        /// Empty for everything that takes no `Fn`-typed parameter.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        callbacks: Vec<String>,
     }
 
     #[derive(Serialize)]
     struct RegistryInspection {
-        total_ops: usize,
-        ops: Vec<RegistryOp>,
+        total_types: usize,
+        total_fns: usize,
+        fns: Vec<RegistryFn>,
     }
 
-    let ops: Vec<RegistryOp> = registry
-        .entries
-        .iter()
-        .map(|e| RegistryOp {
-            name: e.name.clone(),
-            arity: e.arity,
-            deterministic: e.deterministic,
-            profiles: e.profiles.clone(),
-            id: e.id,
+    let Some(scope) = scope else {
+        println!("no registry loaded (the pipeline was configured without --reg)");
+        println!();
+        return;
+    };
+
+    // Reverse the projection name table once: identities are what the scope is
+    // keyed by, but names are what a person reads.
+    let by_id: std::collections::HashMap<crate::fabric::hash::Hash256, &str> =
+        scope.names.iter().map(|(n, id)| (*id, n.as_str())).collect();
+    let show = |id: &crate::fabric::hash::Hash256| -> String {
+        by_id.get(id).map(|n| n.to_string()).unwrap_or_else(|| id.to_hex())
+    };
+
+    let mut fns: Vec<RegistryFn> = scope
+        .fns
+        .values()
+        .map(|g| RegistryFn {
+            name: show(&g.identity),
+            identity: g.identity.to_hex(),
+            kind: match g.kind {
+                FnKind::Leaf => "leaf".to_string(),
+                FnKind::Composite => "composite".to_string(),
+            },
+            inputs: g.inputs.iter().map(&show).collect(),
+            output: show(&g.output),
+            effect: match scope.leaf_facts.get(&g.identity) {
+                Some(lf) => render_effect(lf.effect_class),
+                // A composite's effect is derived from its body, never declared.
+                None => "derived".to_string(),
+            },
+            variadic: g.variadic,
+            callbacks: scope
+                .hof_callback_contracts
+                .get(&g.identity)
+                .map(|cs| {
+                    cs.iter()
+                        .map(|c| {
+                            format!(
+                                "{} ({}) -> {}",
+                                c.position,
+                                c.inputs.iter().map(&show).collect::<Vec<_>>().join(", "),
+                                show(&c.output)
+                            )
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
         })
         .collect();
+    // Deterministic output: identity order is a hash-map walk, name order is not.
+    fns.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.identity.cmp(&b.identity)));
 
     let inspection = RegistryInspection {
-        total_ops: ops.len(),
-        ops,
+        total_types: scope.types.len(),
+        total_fns: fns.len(),
+        fns,
     };
 
     let yaml = serde_yaml::to_string(&inspection).unwrap();
     println!("{}", yaml);
 }
 
-// Wave S3: Lowering spec inspection
-#[allow(dead_code)]
-fn dump_lowering_spec_inspection(spec: &spec_driven::LoweringSpec) {
-    println!("═══════════════════════════════════════════════════════════");
-    println!("LOWERING SPEC INSPECTION");
-    println!("═══════════════════════════════════════════════════════════");
-    println!();
-
-    #[derive(Serialize)]
-    struct LoweringSpecInfo {
-        version: String,
-        target_ir: String,
-        source_path: Option<String>,
-        content_hash: Option<String>,
-        total_rules: usize,
-        rule_names: Vec<String>,
-    }
-
-    let info = LoweringSpecInfo {
-        version: spec.version.clone(),
-        target_ir: spec.target_ir.clone(),
-        source_path: spec.source_path.clone(),
-        content_hash: spec.content_hash.clone(),
-        total_rules: spec.rules.len(),
-        rule_names: spec.rules.keys().cloned().collect(),
-    };
-
-    let yaml = serde_yaml::to_string(&info).unwrap();
-    println!("{}", yaml);
+/// Render an obligation bitset as the `|`-joined bit names, or `pure` when the
+/// set is empty. Not `Debug`, which would print the raw `EffectClass(8)`.
+fn render_effect(e: EffectClass) -> String {
+    let mut bits = Vec::new();
+    if e.has_reads() { bits.push("reads"); }
+    if e.has_writes() { bits.push("writes"); }
+    if e.has_nondeterministic() { bits.push("nondeterministic"); }
+    if e == EffectClass::FullIo || e.union(EffectClass::FullIo) == e { bits.push("fullIo"); }
+    if e.has_irreversible() { bits.push("irreversible"); }
+    if bits.is_empty() { "pure".to_string() } else { bits.join("|") }
 }
 
-#[allow(dead_code)]
-fn dump_lowering_inspection(ast: &crate::frontend::schema_ast::SchemaAstNode) {
-    println!("═══════════════════════════════════════════════════════════");
-    println!("LOWERING INSPECTION");
-    println!("═══════════════════════════════════════════════════════════");
-    println!();
-
-    #[derive(Serialize)]
-    struct LoweringStep {
-        node_kind: String,
-        variant: Option<String>,
-        action: String,
-    }
-
-    #[derive(Serialize)]
-    struct LoweringInspection {
-        steps: Vec<LoweringStep>,
-    }
-
-    fn collect_lowering_steps(
-        node: &crate::frontend::schema_ast::SchemaAstNode,
-        steps: &mut Vec<LoweringStep>,
-    ) {
-        use crate::frontend::schema_ast::SchemaValue;
-
-        steps.push(LoweringStep {
-            node_kind: node.kind.clone(),
-            variant: None,
-            action: "lower_node".to_string(),
-        });
-
-        for (_name, field_value) in &node.fields {
-            match field_value {
-                SchemaValue::Node(child) => collect_lowering_steps(child, steps),
-                SchemaValue::Nodes(children) => {
-                    for child in children {
-                        collect_lowering_steps(child, steps);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    let mut steps = Vec::new();
-    collect_lowering_steps(ast, &mut steps);
-
-    let inspection = LoweringInspection { steps };
-    let yaml = serde_yaml::to_string(&inspection).unwrap();
-    println!("{}", yaml);
-}
-
-fn dump_core_ir_inspection(core_ir: &crate::ir::core_ir::CoreBundle) {
-    println!("═══════════════════════════════════════════════════════════");
-    println!("CORE IR INSPECTION");
-    println!("═══════════════════════════════════════════════════════════");
-    println!();
-
-    #[derive(Serialize)]
-    struct CoreIRInspection {
-        version: String,
-        term_type: String,
-    }
-
-    use crate::ir::core_ir::CoreTerm;
-
-    let term_type = match &core_ir.core_term {
-        CoreTerm::CIntLit { .. } => "CIntLit".to_string(),
-        CoreTerm::CBoolLit { .. } => "CBoolLit".to_string(),
-        CoreTerm::CUnitLit { .. } => "CUnitLit".to_string(),
-        CoreTerm::CLam { .. } => "CLam".to_string(),
-        CoreTerm::CLet { .. } => "CLet".to_string(),
-        CoreTerm::CIf { .. } => "CIf".to_string(),
-        CoreTerm::CVar { .. } => "CVar".to_string(),
-        CoreTerm::CApp { .. } => "CApp".to_string(),
-        CoreTerm::CCall { .. } => "CCall".to_string(),
-    };
-
-    let inspection = CoreIRInspection {
-        version: core_ir.version.to_string(),
-        term_type,
-    };
-
-    let yaml = serde_yaml::to_string(&inspection).unwrap();
-    println!("{}", yaml);
-}
+// dump_lowering_spec_inspection deleted: Bundle 8 (2026-06-08) — no call-site in run_inspection.
+// dump_lowering_inspection deleted: Bundle 8 (2026-06-08) — no call-site in run_inspection.
+// dump_core_ir_inspection removed in Phase 3d (legacy Core IR 0.3 model retired).
 
 fn dump_pipeline_inspection(
     executed_stages: &[String],
@@ -796,166 +762,88 @@ fn dump_pipeline_inspection(
     println!("{}", yaml);
 }
 
-// WAVE 2: Normalisation inspection
-#[allow(dead_code)]
-fn dump_normalisation_inspection(trace: &crate::normalisation::NormalisationTrace) {
+// dump_normalisation_inspection deleted in Bundle 4 (2026-06-08).
+// dump_nf_inspection deleted in Bundle 8 (2026-06-08) — no call-site in run_inspection.
+//   The normalisation/nf stages output inline at run_inspection lines 202-206.
+// dump_code_trace_inspection removed in Phase 3d (legacy Core IR 0.3 model retired).
+// dump_hook_inspection deleted in Bundle 8 (2026-06-08) — no call-site in run_inspection.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core IR 0.5 inspection (additive — Phase 3c)
+//
+// Reads the flat node table by index (linear scan — no tree recursion).
+// The legacy `dump_core_ir_inspection` (CoreTerm recursive tree) is untouched.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Dump a human-readable inspection of a Core IR 0.5 `CoreBundle`.
+///
+/// Additive 0.5 read path — iterates the flat node table linearly.
+pub fn dump_core_ir_05_inspection(bundle: &crate::ir::core_ir_05::CoreBundle) {
+    use crate::ir::core_ir_05::Node;
+
     println!("═══════════════════════════════════════════════════════════");
-    println!("NORMALISATION INSPECTION");
+    println!("CORE IR 0.5 INSPECTION");
     println!("═══════════════════════════════════════════════════════════");
     println!();
-
-    #[derive(Serialize)]
-    struct PassInspection {
-        pass_id: String,
-        pass_name: String,
-        duration_ms: f64,
-        modified: bool,
-        input_node_kind: String,
-        output_node_kind: String,
-    }
-
-    #[derive(Serialize)]
-    struct NormalisationInspection {
-        total_passes: usize,
-        total_duration_ms: f64,
-        passes: Vec<PassInspection>,
-        final_node_kind: String,
-    }
-
-    let mut passes = Vec::new();
-    for exec in &trace.executions {
-        passes.push(PassInspection {
-            pass_id: exec.pass_id.clone(),
-            pass_name: exec.pass_name.clone(),
-            duration_ms: exec.duration.as_secs_f64() * 1000.0,
-            modified: exec.modified,
-            input_node_kind: exec.input_ast.kind.clone(),
-            output_node_kind: exec.output_ast.kind.clone(),
-        });
-    }
-
-    let inspection = NormalisationInspection {
-        total_passes: trace.executions.len(),
-        total_duration_ms: trace.total_duration.as_secs_f64() * 1000.0,
-        passes,
-        final_node_kind: trace.final_ast.kind.clone(),
-    };
-
-    let yaml = serde_yaml::to_string(&inspection).unwrap();
-    println!("{}", yaml);
+    println!("version:       {}", bundle.version);
+    println!("pool_entries:  {}", bundle.constant_pool.len());
+    println!("node_count:    {}", bundle.nodes.len());
     println!();
 
-    // Pass-by-pass breakdown
-    println!("Pass Execution Details:");
-    println!();
-    for exec in &trace.executions {
-        println!("  {} - {}", exec.pass_id, exec.pass_name);
-        println!(
-            "    Duration: {:.3}ms",
-            exec.duration.as_secs_f64() * 1000.0
-        );
-        println!("    Modified: {}", if exec.modified { "yes" } else { "no" });
-        println!("    Input:  {}", exec.input_ast.kind);
-        println!("    Output: {}", exec.output_ast.kind);
-        println!();
+    for (i, entry) in bundle.constant_pool.iter().enumerate() {
+        println!("  pool[{}]  def_hash={}  payload_bytes={}", i, entry.def_hash, entry.payload.len());
     }
 
-    println!("Final AST: {}", trace.final_ast.kind);
-    println!();
-
-    // WAVE 2: All passes are identity
-    println!("Note: WAVE 2 passes are identity/sanity only.");
-    println!("Future waves will implement desugaring rules.");
+    for (i, node) in bundle.nodes.iter().enumerate() {
+        match node {
+            Node::CCall { target_name, target_identity, args } => {
+                println!("  node[{}]  CCall  target={}  ({})  args={}", i, target_name, target_identity, args.len());
+            }
+            Node::CIf { cond, then_, else_ } => {
+                println!("  node[{}]  CIf  cond={:?}  then={:?}  else={:?}", i, cond, then_, else_);
+            }
+            Node::CDeterminate => {
+                println!("  node[{}]  CDeterminate  gate", i);
+            }
+            Node::CBlock => {
+                println!("  node[{}]  CBlock", i);
+            }
+            Node::CEnd { value } => {
+                println!("  node[{}]  CEnd  value={:?}", i, value);
+            }
+        }
+    }
     println!();
 }
 
-// WAVE 1: Normal Form inspection
-#[allow(dead_code)]
-fn dump_nf_inspection(
-    node: &schema_ast::SchemaAstNode,
-    validation_result: &crate::normalisation::NfValidationResult,
-) {
-    println!("═══════════════════════════════════════════════════════════");
-    println!("NORMAL FORM (NF) INSPECTION");
-    println!("═══════════════════════════════════════════════════════════");
-    println!();
+#[cfg(test)]
+mod tests_05 {
+    use super::dump_core_ir_05_inspection;
 
-    #[derive(Serialize)]
-    struct NfInspection {
-        nf_version: String,
-        validation_passed: bool,
-        error: Option<String>,
-        admissible_nodes: Vec<String>,
-        forbidden_nodes: Vec<String>,
-        nodes_in_ast: Vec<String>,
+    const PILOT_AXREG: &str = include_str!("../../registries/pilot_lowering.axreg");
+
+    fn pilot_scope() -> crate::registry::core05::fold::Scope {
+        crate::registry::core05::text::lower(PILOT_AXREG)
+            .expect("pilot registry must load cleanly")
+            .scope
     }
 
-    let admissible_nodes: Vec<String> = crate::normalisation::get_admissible_nodes()
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    // Verify dump_core_ir_05_inspection doesn't panic on a simple bundle
+    #[test]
+    fn dump_empty_bundle_does_not_panic() {
+        use crate::frontend::schema_ast::SchemaAstNode;
+        use crate::frontend::token::Span;
+        use crate::lowering::nf_lowering::lower_nf_to_bundle_05;
+        use std::collections::HashMap;
 
-    let forbidden_nodes: Vec<String> = crate::normalisation::get_forbidden_nodes()
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-
-    let nodes_in_ast = crate::normalisation::collect_node_kinds(node);
-
-    let (validation_passed, error) = match validation_result {
-        Ok(()) => (true, None),
-        Err(e) => (false, Some(e.to_string())),
-    };
-
-    let inspection = NfInspection {
-        nf_version: "H1-1.0".to_string(),
-        validation_passed,
-        error,
-        admissible_nodes,
-        forbidden_nodes,
-        nodes_in_ast,
-    };
-
-    let yaml = serde_yaml::to_string(&inspection).unwrap();
-    println!("{}", yaml);
-    println!();
-
-    if !validation_passed {
-        println!("❌ NF VALIDATION FAILED");
-        println!();
-        println!("The Schema AST contains non-NF constructs.");
-        println!("Normalisation is required before lowering.");
-        println!();
-    } else {
-        println!("✅ NF VALIDATION PASSED");
-        println!();
-        println!("The Schema AST conforms to Normal Form H1.");
-        println!("Ready for lowering.");
-        println!();
+        let scope = pilot_scope();
+        let unit_node = SchemaAstNode {
+            kind: "UnitLit".to_string(),
+            fields: HashMap::new(),
+            annotations: Default::default(),
+            span: Span::new(0, 0),
+        };
+        let bundle = lower_nf_to_bundle_05(&unit_node, &scope).unwrap();
+        dump_core_ir_05_inspection(&bundle);
     }
-}
-
-// Wave T1: Code trace inspection
-fn dump_code_trace_inspection(
-    tokens: &[crate::frontend::token::Token],
-    parse_tree: &crate::frontend::parser_runtime::ParseTree,
-    schema_ast: &crate::frontend::schema_ast::SchemaAstNode,
-    core_ir: &crate::ir::core_ir::CoreBundle,
-) -> Result<(), PipelineError> {
-    use crate::introspection::code_trace;
-
-    let entries = code_trace::generate_code_trace(tokens, parse_tree, schema_ast, core_ir)
-        .map_err(|e| PipelineError::Inspection {
-            message: e.to_string(),
-        })?;
-
-    code_trace::render_trace(&entries);
-    Ok(())
-}
-
-// WAVE 4: Hook execution inspection
-#[allow(dead_code)]
-fn dump_hook_inspection(trace: &crate::hooks::HookExecutionTrace) {
-    // Use the built-in formatting from HookExecutionTrace
-    print!("{}", trace.format_for_inspection());
 }

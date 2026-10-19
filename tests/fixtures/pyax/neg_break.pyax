@@ -1,0 +1,9 @@
+# expect-error: neg_break.pyax:7:13:
+# expect-error: `break` is not in PyAx
+def main(args: list[str]) -> int:
+    n = 0
+    for x in [1, 2, 3]:
+        if x == 2:
+            break
+        n += x
+    return n

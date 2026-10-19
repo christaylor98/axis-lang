@@ -7,7 +7,7 @@
 // - Ignored by execution
 
 use crate::frontend::token::Span;
-use crate::ir::core_ir::{Annotation, AnnotationValue};
+use crate::frontend::schema_ast::{Annotation, AnnotationValue};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PROVENANCE NAMESPACES

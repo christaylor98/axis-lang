@@ -1,0 +1,6 @@
+// Matrix fixture: CallExpr
+// Registry call: const_unit is in the pilot scope.
+// Type mismatch (Bool arg vs Unit param) is irrelevant — no type check at this stage.
+fn f(x: Bool) -> Bool {
+  const_unit(x)
+}

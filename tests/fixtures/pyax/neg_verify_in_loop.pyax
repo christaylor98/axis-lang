@@ -1,0 +1,12 @@
+# expect-error: in a loop body in `count_chars`: TypeMismatch
+# a Value the verifier finds is not a Text: expand cannot see a Value's contents
+def count_chars(xs: list[int]) -> int:
+    n = 0
+    for x in xs:
+        k: int = str_len(ctor_field(value_make(x), 0))
+        n += k
+    return n
+
+
+def main(args: list[str]) -> int:
+    return count_chars([1, 2])

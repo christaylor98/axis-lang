@@ -1,0 +1,29 @@
+# expect-exit: 0
+# dicts: {} first-store, d[k] = v, d[k] += 1, get, in, keys/values/items,
+# iteration over keys, del, len, literals
+def word_counts(text: str) -> dict[str, int]:
+    counts = {}
+    for w in text.split(" "):
+        if len(w) > 0:
+            counts[w] = counts.get(w, 0) + 1
+    return counts
+
+
+def main(args: list[str]) -> int:
+    c = word_counts("the cat and the hat and the bat")
+    print(c["the"], c["cat"], len(c))
+    print("dog" in c, "cat" in c)
+    total = 0
+    for k in c:
+        total += c[k]
+    print(total)
+    for word, n in c.items():
+        if n > 1:
+            print(word + ":" + str(n))
+    ages = {"ann": 31, "bob": 25}
+    ages["cy"] = 40
+    ages["bob"] += 1
+    del ages["ann"]
+    print(sorted(ages.keys()))
+    print(sum(ages.values()))
+    return ages["bob"]

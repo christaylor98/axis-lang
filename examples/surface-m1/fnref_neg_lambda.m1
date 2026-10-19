@@ -1,0 +1,13 @@
+// AXIS_FN_REF_ARG_VERIFY_V1 — known boundary: arg-position LAMBDA.
+// A LamExpr in argument position lowers to a CLam (sentinel pool entries +
+// body NodeRef), not a fn-ref typed constant. Verifier MUST reject because
+// the lambda's result type is not the Fn type — this is the documented
+// boundary noted in the verify intent (deferred per "implement the minimum
+// the scenario needs").
+//
+// Expected: Verification failed: TypeMismatch (expected = Fn type hash,
+// got = lambda body's type / ZERO hash). NOT a successful verify.
+
+fn fnref_neg_lambda() -> Unit {
+  apply_handler(fn(x) { Unit() })
+}

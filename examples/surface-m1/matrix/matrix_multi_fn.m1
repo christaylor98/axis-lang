@@ -1,0 +1,8 @@
+// Matrix fixture: multi-function program
+// Two FnDecl items → NF root is Program{items:[FnDecl, FnDecl]}.
+fn first(x: Bool) -> Bool {
+  x
+}
+fn second(y: Bool) -> Bool {
+  y
+}

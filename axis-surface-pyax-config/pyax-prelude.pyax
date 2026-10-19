@@ -1,0 +1,818 @@
+# PyAx prelude — compiled into every PyAx program (pyax-expand.yaml `prelude:`).
+#
+# D9 (c): Python meanings that no single registry callable has, written in PyAx.
+# Each def becomes its own bundle, linked like any other function; several use
+# loops, so the prelude also exercises expand's own loop lowering.
+
+
+# Python's floor division. The bridge's int_div is Euclidean: equal to floor
+# for a positive divisor, one more than floor for a negative divisor with a
+# remainder. For b < 0, floor(a / b) == floor(-a / -b), and -b > 0.
+def py_floordiv(a: int, b: int) -> int:
+    # Python raises (exit 3, as for floats); the bridge's int_div would fault
+    # as a Defect (exit 4) instead.
+    if b == 0:
+        raise ZeroDivisionError("integer division or modulo by zero")
+    if b > 0:
+        return int_div(a, b)
+    return int_div(0 - a, 0 - b)
+
+
+# Python's %: the remainder takes the divisor's sign.
+def py_mod(a: int, b: int) -> int:
+    return a - b * py_floordiv(a, b)
+
+
+def py_neg(x: int) -> int:
+    return 0 - x
+
+
+def py_bool_str(b: bool) -> str:
+    if b:
+        return "True"
+    return "False"
+
+
+def py_bool_eq(a: bool, b: bool) -> bool:
+    if a:
+        return b
+    return not b
+
+
+# A Python index into a sequence of length n: negative counts from the end.
+# Out of range stays out of range, and the access faults.
+def py_index(n: int, i: int) -> int:
+    if i < 0:
+        return i + n
+    return i
+
+
+def py_list_set(xs: ValueList, i: int, v: Value) -> ValueList:
+    n: int = list_len(xs)
+    j = py_index(n, i)
+    return list_set(xs, j, v)          # in place when xs is unshared (PYAX_LIST_IN_PLACE_V1)
+
+
+def py_list_last(xs: ValueList) -> Value:
+    n: int = list_len(xs)
+    return pyax_list_get(xs, n - 1)
+
+
+def py_list_drop_last(xs: ValueList) -> ValueList:
+    return list_drop_last(xs)
+
+
+def py_sum_int(xs: list[int]) -> int:
+    total = 0
+    for x in xs:
+        total += x
+    return total
+
+
+def py_max_int(xs: list[int]) -> int:
+    best = xs[0]
+    for x in xs:
+        if x > best:
+            best = x
+    return best
+
+
+def py_min_int(xs: list[int]) -> int:
+    best = xs[0]
+    for x in xs:
+        if x < best:
+            best = x
+    return best
+
+
+def py_contains_int(xs: list[int], v: int) -> bool:
+    for x in xs:
+        if x == v:
+            return True
+    return False
+
+
+def py_contains_text(xs: list[str], v: str) -> bool:
+    for x in xs:
+        if x == v:
+            return True
+    return False
+
+
+# Insertion sort: stable, O(n^2); fine for the sizes PyAx programs sort.
+def py_sorted_int(xs: list[int]) -> list[int]:
+    out: list[int] = []
+    for x in xs:
+        placed = False
+        nxt: list[int] = []
+        for y in out:
+            if not placed and x < y:
+                nxt.append(x)
+                placed = True
+            nxt.append(y)
+        if not placed:
+            nxt.append(x)
+        out = nxt
+    return out
+
+
+def py_sorted_text(xs: list[str]) -> list[str]:
+    out: list[str] = []
+    for x in xs:
+        placed = False
+        nxt: list[str] = []
+        for y in out:
+            if not placed and x < y:
+                nxt.append(x)
+                placed = True
+            nxt.append(y)
+        if not placed:
+            nxt.append(x)
+        out = nxt
+    return out
+
+
+def py_list_del(xs: ValueList, i: int) -> ValueList:
+    n: int = list_len(xs)
+    j = py_index(n, i)
+    return list_remove(xs, j)
+
+
+# A Python slice bound: negative counts from the end, then clamp to [0, n].
+def py_clamp(n: int, i: int) -> int:
+    if i < 0:
+        i = i + n
+    if i < 0:
+        return 0
+    if i > n:
+        return n
+    return i
+
+
+def py_list_slice(xs: ValueList, lo: int, hi: int) -> ValueList:
+    n: int = list_len(xs)
+    return slice(xs, py_clamp(n, lo), py_clamp(n, hi))
+
+
+def py_text_slice(s: str, lo: int, hi: int) -> str:
+    n = len(s)
+    a = py_clamp(n, lo)
+    b = py_clamp(n, hi)
+    if a >= b:
+        return ""
+    return str_slice(s, a, b)
+
+
+def py_text_reverse(s: str) -> str:
+    out = ""
+    for c in s:
+        out = c + out
+    return out
+
+
+# ── dicts: (keys, values), two parallel lists in insertion order ──────────
+
+def py_dict_keys(d: Value) -> ValueList:
+    return flatten(list_make(ctor_field(d, 0)))
+
+
+def py_dict_values(d: Value) -> ValueList:
+    return flatten(list_make(ctor_field(d, 1)))
+
+
+def py_dict_len(d: Value) -> int:
+    n: int = list_len(py_dict_keys(d))
+    return n
+
+
+# The position of key k, or -1. Folds over the keys themselves, so the list
+# is not carried in the loop state.
+def py_dict_find(d: Value, k: Value) -> int:
+    keys: list[Value] = py_dict_keys(d)
+    i = 0
+    for key in keys:
+        same: bool = value_eq(key, k)
+        if same:
+            return i
+        i += 1
+    return -1
+
+
+def py_dict_has(d: Value, k: Value) -> bool:
+    return py_dict_find(d, k) >= 0
+
+
+def py_dict_get(d: Value, k: Value) -> Value:
+    i = py_dict_find(d, k)
+    if i < 0:
+        return fail("KeyError: key not in dict")
+    return pyax_list_get(py_dict_values(d), i)
+
+
+def py_dict_get_or(d: Value, k: Value, default: Value) -> Value:
+    i = py_dict_find(d, k)
+    if i < 0:
+        return default
+    return pyax_list_get(py_dict_values(d), i)
+
+
+def py_dict_set(d: Value, k: Value, v: Value) -> Value:
+    i = py_dict_find(d, k)
+    keys = py_dict_keys(d)
+    vals = py_dict_values(d)
+    if i < 0:
+        return value_make(flatten(list_make(keys, list_make(k))), flatten(list_make(vals, list_make(v))))
+    return value_make(keys, py_list_set(vals, i, v))
+
+
+# dict(pairs) / dict(zip(keys, values)): a repeated key keeps its first
+# position and its last value, as in Python.
+def py_dict_from_pairs(pairs: list[Value]) -> Value:
+    d: Value = value_make(list_make(), list_make())
+    for p in pairs:
+        d = py_dict_set(d, ctor_field(p, 0), ctor_field(p, 1))
+    return d
+
+
+def py_dict_from_lists(ks: list[Value], vs: list[Value]) -> Value:
+    d: Value = value_make(list_make(), list_make())
+    for k, v in zip(ks, vs):
+        d = py_dict_set(d, k, v)
+    return d
+
+
+def py_dict_del(d: Value, k: Value) -> Value:
+    i = py_dict_find(d, k)
+    if i < 0:
+        return fail("KeyError: key not in dict")
+    return value_make(py_list_del(py_dict_keys(d), i), py_list_del(py_dict_values(d), i))
+
+
+def py_dict_items(d: Value) -> ValueList:
+    keys: list[Value] = py_dict_keys(d)
+    vals: list[Value] = py_dict_values(d)
+    out: list[Value] = []
+    for i, k in enumerate(keys):
+        pair: Value = value_make(k, vals[i])
+        out.append(pair)
+    return out
+
+
+# x ** n for n >= 0, by repeated squaring. Python gives a float for n < 0,
+# which PyAx does not have.
+def py_pow(x: int, n: int) -> int:
+    if n < 0:
+        raise ValueError("negative exponent: PyAx has no floats")
+    result = 1
+    base = x
+    e = n
+    while e > 0:
+        if e % 2 == 1:
+            result = result * base
+        e = e // 2
+        # square only while another bit needs it: the last square could
+        # overflow although the result fits (10 ** 18)
+        if e > 0:
+            base = base * base
+    return result
+
+
+# ASCII character classes, with Python's whole-string rules.
+def py_char_class(c: str) -> int:
+    o = ord(c)
+    if 97 <= o <= 122:
+        return 1
+    if 65 <= o <= 90:
+        return 2
+    if 48 <= o <= 57:
+        return 3
+    if o == 32 or 9 <= o <= 13:
+        return 4
+    return 0
+
+
+def py_islower(s: str) -> bool:
+    cased = False
+    for c in s:
+        k = py_char_class(c)
+        if k == 2:
+            return False
+        if k == 1:
+            cased = True
+    return cased
+
+
+def py_isupper(s: str) -> bool:
+    cased = False
+    for c in s:
+        k = py_char_class(c)
+        if k == 1:
+            return False
+        if k == 2:
+            cased = True
+    return cased
+
+
+def py_isdigit(s: str) -> bool:
+    if len(s) == 0:
+        return False
+    for c in s:
+        if py_char_class(c) != 3:
+            return False
+    return True
+
+
+def py_isalpha(s: str) -> bool:
+    if len(s) == 0:
+        return False
+    for c in s:
+        k = py_char_class(c)
+        if k != 1 and k != 2:
+            return False
+    return True
+
+
+def py_isspace(s: str) -> bool:
+    if len(s) == 0:
+        return False
+    for c in s:
+        if py_char_class(c) != 4:
+            return False
+    return True
+
+
+# s.split(): split on runs of whitespace; no empty parts.
+def py_split_ws(s: str) -> list[str]:
+    out: list[str] = []
+    cur = ""
+    for c in s:
+        if py_char_class(c) == 4:
+            if len(cur) > 0:
+                out.append(cur)
+            cur = ""
+        else:
+            cur = cur + c
+    if len(cur) > 0:
+        out.append(cur)
+    return out
+
+
+def py_max_text(xs: list[str]) -> str:
+    best = xs[0]
+    for x in xs:
+        if x > best:
+            best = x
+    return best
+
+
+def py_min_text(xs: list[str]) -> str:
+    best = xs[0]
+    for x in xs:
+        if x < best:
+            best = x
+    return best
+
+
+# ── floats and decimals ───────────────────────────────────────────────────
+
+# Python's str(float): the bridge prints the same shortest round-trip digits
+# but never in exponent form and without a trailing `.0`. Python switches to
+# exponent form below 1e-4 and from 1e16, with at least two exponent digits.
+def py_float_str(x: float) -> str:
+    nan: bool = float_is_nan(x)
+    if nan:
+        return "nan"
+    s: str = float_to_text(x)
+    if s == "inf" or s == "-inf":
+        return s
+    sign = ""
+    if s.startswith("-"):
+        sign = "-"
+        s = s[1:]
+    whole = s
+    frac = ""
+    dot = s.find(".")
+    if dot >= 0:
+        whole = s[:dot]
+        frac = s[dot + 1:]
+    exp = 0
+    digits = ""
+    if whole != "0":
+        exp = len(whole) - 1
+        digits = whole + frac
+    else:
+        z = 0
+        while z < len(frac) and frac[z] == "0":
+            z += 1
+        exp = -(z + 1)
+        digits = frac[z:]
+    while len(digits) > 1 and digits[-1] == "0":
+        digits = digits[:-1]
+    if len(digits) == 0:
+        digits = "0"
+    if exp >= 16 or (exp < -4 and digits != "0"):
+        mant = digits[0]
+        if len(digits) > 1:
+            mant = mant + "." + digits[1:]
+        mark = "+"
+        if exp < 0:
+            mark = "-"
+        e = str(abs(exp))
+        if len(e) < 2:
+            e = "0" + e
+        return sign + mant + "e" + mark + e
+    if len(frac) == 0:
+        return sign + whole + ".0"
+    return sign + s
+
+
+def py_truediv(a: float, b: float) -> float:
+    if b == 0.0:
+        raise ZeroDivisionError("division by zero")
+    return float_div(a, b)
+
+
+def py_float_floordiv(a: float, b: float) -> float:
+    if b == 0.0:
+        raise ZeroDivisionError("float floor division by zero")
+    return float_floor(float_div(a, b))
+
+
+def py_float_mod(a: float, b: float) -> float:
+    if b == 0.0:
+        raise ZeroDivisionError("float modulo")
+    q: float = float_floor(float_div(a, b))
+    return a - b * q
+
+
+# round(x): to the nearest int, halves to even (Python's banker's rounding).
+def py_round(x: float) -> int:
+    f: float = float_floor(x)
+    d = x - f
+    n = int(f)
+    if d > 0.5:
+        return n + 1
+    if d < 0.5:
+        return n
+    if n % 2 == 0:
+        return n
+    return n + 1
+
+
+# round(x, n): Python rounds the exact binary value of x, so 2.675 (really
+# 2.67499...) gives 2.67, where round(x * 100) / 100 would give 2.68. Pick
+# the nearer of the two candidates; subtracting nearby floats is exact.
+def py_round_to(x: float, digits: int) -> float:
+    m = 10.0 ** digits
+    f: float = float_floor(x * m)
+    lo = f / m
+    hi = (f + 1.0) / m
+    dl = x - lo
+    dh = hi - x
+    if dl < dh:
+        return lo
+    if dh < dl:
+        return hi
+    if py_float_mod(f, 2.0) == 0.0:
+        return lo
+    return hi
+
+
+def py_sum_float(xs: list[float]) -> float:
+    total = 0.0
+    for x in xs:
+        total += x
+    return total
+
+
+def py_max_float(xs: list[float]) -> float:
+    best = xs[0]
+    for x in xs:
+        if x > best:
+            best = x
+    return best
+
+
+def py_min_float(xs: list[float]) -> float:
+    best = xs[0]
+    for x in xs:
+        if x < best:
+            best = x
+    return best
+
+
+def py_dec_div(a: Decimal, b: Decimal) -> Decimal:
+    if b == Decimal(0):
+        raise ZeroDivisionError("decimal division by zero")
+    return dec_div(a, b)
+
+
+def py_isclose(a: float, b: float) -> bool:
+    return abs(a - b) <= max(1e-09 * max(abs(a), abs(b)), 0.0)
+
+
+def py_maybe_reverse(xs: ValueList, rev: bool) -> ValueList:
+    if rev:
+        return pyax_list_reverse(xs)
+    return xs
+
+
+# ── sorting tuples by order-preserving text keys ──────────────────────────
+
+def py_pad19(s: str) -> str:
+    while len(s) < 19:
+        s = "0" + s
+    return s
+
+
+# Ints: a sign digit, then 19 digits (negatives offset by 2**63).
+def py_key_int(n: int) -> str:
+    if n < 0:
+        return "0" + py_pad19(str(n + 9223372036854775807 + 1))
+    return "1" + py_pad19(str(n))
+
+
+# Texts: terminated by chr(0), lower than any character, so "ab" < "abc".
+def py_key_text(s: str) -> str:
+    return s + chr(0)
+
+
+def py_key_bool(b: bool) -> str:
+    if b:
+        return "1"
+    return "0"
+
+
+# xs ordered by keys, stably (equal keys keep their order, also reversed).
+def py_sort_by_keys(xs: list[Value], keys: list[str], rev: bool) -> ValueList:
+    n = len(keys)
+    tagged: list[str] = []
+    for i, k in enumerate(keys):
+        j = i
+        if rev:
+            j = n - 1 - i
+        tagged.append(k + chr(1) + py_pad19(str(j)))
+    order = py_sorted_text(tagged)
+    if rev:
+        order = order[::-1]
+    out: list[Value] = []
+    for t in order:
+        idx = int(t[-19:])
+        if rev:
+            idx = n - 1 - idx
+        v: Value = pyax_list_get(xs, idx)
+        out.append(v)
+    return out
+
+
+# repr() of a text: single-quoted unless it holds ' and no ", with escapes.
+def py_repr_text(s: str) -> str:
+    q = "'"
+    if "'" in s and '"' not in s:
+        q = '"'
+    out = ""
+    for c in s:
+        if c == "\\":
+            out += "\\\\"
+        elif c == "\n":
+            out += "\\n"
+        elif c == "\t":
+            out += "\\t"
+        elif c == q:
+            out += "\\" + q
+        else:
+            out += c
+    return q + out + q
+
+
+def py_repr_dec(d: Decimal) -> str:
+    return "Decimal('" + str(d) + "')"
+
+
+# The state of the key-collecting fold: (keys, items).
+def py_sort_state(st: Value, rev: bool) -> ValueList:
+    keys: list[str] = flatten(list_make(ctor_field(st, 0)))
+    xs: list[Value] = flatten(list_make(ctor_field(st, 1)))
+    return py_sort_by_keys(xs, keys, rev)
+
+
+# xs.insert(i, v): Python clamps i to [0, len] after counting negatives from the end.
+def py_list_insert(xs: ValueList, i: int, v: Value) -> ValueList:
+    n: int = list_len(xs)
+    j = py_clamp(n, i)
+    return list_insert(xs, j, v)
+
+
+# d | e: a new dict with e's entries over d's.
+def py_dict_merge(d: Value, e: Value) -> Value:
+    keys: list[Value] = py_dict_keys(e)
+    vals: list[Value] = py_dict_values(e)
+    out = d
+    for i, k in enumerate(keys):
+        out = py_dict_set(out, k, vals[i])
+    return out
+
+
+# ── more builtins and str methods (pyaxc primer parity) ───────────────────
+
+def py_any(xs: list[bool]) -> bool:
+    for x in xs:
+        if x:
+            return True
+    return False
+
+
+def py_all(xs: list[bool]) -> bool:
+    for x in xs:
+        if not x:
+            return False
+    return True
+
+
+def py_chars(s: str) -> list[str]:
+    out: list[str] = []
+    for c in s:
+        out.append(c)
+    return out
+
+
+def py_list_repeat(xs: list[Value], n: int) -> ValueList:
+    out: list[Value] = []
+    for i in range(n):
+        out.extend(xs)
+    return out
+
+
+# xs[lo:hi:step] for any non-zero step, Python's bounds. `has_lo` / `has_hi`
+# say whether the bound was written (the defaults depend on the sign of step).
+def py_slice_indices(n: int, lo: int, hi: int, step: int, has_lo: bool, has_hi: bool) -> list[int]:
+    if step == 0:
+        raise ValueError("slice step cannot be zero")
+    out: list[int] = []
+    if step > 0:
+        a = 0
+        b = n
+        if has_lo:
+            a = py_clamp(n, lo)
+        if has_hi:
+            b = py_clamp(n, hi)
+        i = a
+        while i < b:
+            out.append(i)
+            i += step
+    else:
+        a = n - 1
+        b = -1
+        if has_lo:
+            a = lo
+            if a < 0:
+                a += n
+            if a >= n:
+                a = n - 1
+        if has_hi:
+            b = hi
+            if b < 0:
+                b += n
+            if b < 0:
+                b = -1
+        i = a
+        while i > b:
+            if i >= 0:
+                out.append(i)
+            i += step
+    return out
+
+
+def py_list_slice_step(xs: list[Value], lo: int, hi: int, step: int, has_lo: bool, has_hi: bool) -> ValueList:
+    out: list[Value] = []
+    for i in py_slice_indices(len(xs), lo, hi, step, has_lo, has_hi):
+        out.append(xs[i])
+    return out
+
+
+def py_text_slice_step(s: str, lo: int, hi: int, step: int, has_lo: bool, has_hi: bool) -> str:
+    out = ""
+    for i in py_slice_indices(len(s), lo, hi, step, has_lo, has_hi):
+        out += s[i]
+    return out
+
+
+def py_lstrip(s: str) -> str:
+    i = 0
+    while i < len(s) and py_char_class(s[i]) == 4:
+        i += 1
+    return s[i:]
+
+
+def py_rstrip(s: str) -> str:
+    j = len(s)
+    while j > 0 and py_char_class(s[j - 1]) == 4:
+        j -= 1
+    return s[:j]
+
+
+def py_splitlines(s: str) -> list[str]:
+    out: list[str] = []
+    cur = ""
+    for c in s:
+        if c == "\n":
+            out.append(cur)
+            cur = ""
+        else:
+            cur += c
+    if len(cur) > 0:
+        out.append(cur)
+    return out
+
+
+def py_rfind(s: str, sub: str) -> int:
+    i = len(s) - len(sub)
+    while i >= 0:
+        if s[i:i + len(sub)] == sub:
+            return i
+        i -= 1
+    return -1
+
+
+def py_str_index(s: str, sub: str) -> int:
+    i = s.find(sub)
+    if i < 0:
+        raise ValueError("substring not found")
+    return i
+
+
+def py_count(s: str, sub: str) -> int:
+    if len(sub) == 0:
+        return len(s) + 1
+    n = 0
+    i = 0
+    while i <= len(s) - len(sub):
+        if s[i:i + len(sub)] == sub:
+            n += 1
+            i += len(sub)
+        else:
+            i += 1
+    return n
+
+
+def py_isalnum(s: str) -> bool:
+    if len(s) == 0:
+        return False
+    for c in s:
+        if py_char_class(c) == 0 or py_char_class(c) == 4:
+            return False
+    return True
+
+
+def py_rjust(s: str, width: int, fill: str) -> str:
+    while len(s) < width:
+        s = fill + s
+    return s
+
+
+def py_ljust(s: str, width: int, fill: str) -> str:
+    while len(s) < width:
+        s = s + fill
+    return s
+
+
+def py_zfill(s: str, width: int) -> str:
+    if s.startswith("-") or s.startswith("+"):
+        return s[0] + py_rjust(s[1:], width - 1, "0")
+    return py_rjust(s, width, "0")
+
+
+def py_capitalize(s: str) -> str:
+    if len(s) == 0:
+        return s
+    return s[0].upper() + s[1:].lower()
+
+
+def py_list_count_int(xs: list[int], v: int) -> int:
+    n = 0
+    for x in xs:
+        if x == v:
+            n += 1
+    return n
+
+
+def py_list_count_text(xs: list[str], v: str) -> int:
+    n = 0
+    for x in xs:
+        if x == v:
+            n += 1
+    return n
+
+
+def py_list_index_int(xs: list[int], v: int) -> int:
+    for i, x in enumerate(xs):
+        if x == v:
+            return i
+    raise ValueError("value is not in list")
+
+
+def py_list_index_text(xs: list[str], v: str) -> int:
+    for i, x in enumerate(xs):
+        if x == v:
+            return i
+    raise ValueError("value is not in list")

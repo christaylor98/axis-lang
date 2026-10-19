@@ -1,0 +1,6 @@
+// AI3 NEGATIVE: no `return` at the tail. Must be rejected at parse.
+// This is the whole point of the surface — a bare tail expression is no
+// longer a body.
+fn n() -> Int {
+  Int(42)
+}

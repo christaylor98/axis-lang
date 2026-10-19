@@ -1,0 +1,6 @@
+// AI3 fixture: call tail.
+// Byte-identity anchor t2_call — must equal the M1 bundle for
+//   fn t2(a: Int, b: Int) -> Int { int_add(a, b) }
+fn t2(a: Int, b: Int) -> Int {
+  return int_add(a, b);
+}

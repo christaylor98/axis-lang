@@ -1,0 +1,6 @@
+// Matrix fixture: nested ValueList(Value(Text, Int)) construction (G3)
+// Lowers to a nested CCall tree (outer list-constructor, inner value-constructor).
+// Element boundaries are recoverable — structurally distinct from a flat sequence.
+fn make(a: Text, b: Int) -> ValueList(Value(Text, Int)) {
+  ValueList(Value(Text, Int))(Value(Text, Int)(a, b))
+}

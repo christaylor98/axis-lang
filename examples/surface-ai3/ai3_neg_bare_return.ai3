@@ -1,0 +1,5 @@
+// AI3 NEGATIVE: `return` with no expression. ReturnStmt requires an Expr;
+// there is no unit-returning bare form. Write `return Unit();` instead.
+fn n() -> Int {
+  return;
+}

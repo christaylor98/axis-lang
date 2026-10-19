@@ -1,0 +1,372 @@
+# M1 (Mechanical 1) Normalization Rules
+# Surface: surface-m1
+# Target NF Version: 0.1
+# Version: 0.1
+#
+# Governed by: AXLANG_TYPE_SYSTEM_V2
+# Invariants: VALUELIST_TAG_MANDATORY, VALUE_RECEIVER_NOT_SENDER,
+#             NO_ALIAS_MECHANISM, NAMING_VIA_FUNCTIONS_ONLY
+#
+# M1 is close to NF by design — desugaring is minimal.
+# Complex transforms (curry, let-chain folding) deferred to future engine version.
+# Note: unwrap_program_items hard-fails for multi-item programs (expected per IS).
+
+version: "0.1"
+target_nf_version: "0.1"
+description: "M1 normalization — minimal desugaring, close to NF by design"
+
+strategy:
+  application_order: "sequential"
+  traversal_order: "bottom_up"
+  default_behavior: "fail_loud"
+  failure_mode: "fail_loud"
+
+rule_order:
+  # Program structure
+  - "desugar_program"
+  - "desugar_item"
+  - "desugar_fn_decl"
+  # Body and let-bindings
+  - "desugar_body"
+  - "desugar_let_binding"
+  - "desugar_let_decl"
+  # Type param nodes (surface-only)
+  - "strip_typed_param_list"
+  - "strip_typed_param_rest"
+  - "strip_typed_param"
+  # Type expression nodes (surface-only)
+  - "strip_value_type_args"
+  - "strip_type_expr"
+  - "strip_value_type_expr"
+  - "strip_valuelist_type_expr"
+  - "strip_prim_type_expr"
+  - "strip_type_expr_rest"
+  # Core expression forms
+  - "normalize_determine_expr"
+  - "desugar_if_expr"
+  - "desugar_value_construct"
+  - "desugar_valuelist_construct"
+  - "desugar_call_expr"
+  - "normalize_ident"
+  - "desugar_expr_variant"
+  # Literals
+  - "normalize_int_lit"
+  - "normalize_text_lit"
+  - "normalize_bool_lit"
+  - "normalize_unit_lit"
+  # Arg helpers
+  - "normalize_arg_list"
+  - "normalize_arg_list_rest"
+  - "normalize_empty"
+
+rules:
+
+  # ── PROGRAM STRUCTURE ─────────────────────────────────────────
+
+  desugar_program:
+    description: "Unwrap Program — single-item programs unwrap to the item; multi-item kept as Program{items}"
+    pattern:
+      node_kind: "Program"
+      fields:
+        items: { exists: true, is_list: true }
+    replacement:
+      nf_node: "unwrap_program_items"
+      nf_fields: "preserve_all"
+
+  desugar_item:
+    description: "Unwrap Item variant (FnDecl or LetDecl)"
+    pattern:
+      node_kind: "Item"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields: "preserve_all"
+
+  desugar_fn_decl:
+    description: "FnDecl — pass through; curried-lambda rewrite deferred to future engine"
+    pattern:
+      node_kind: "FnDecl"
+      fields:
+        name: { exists: true, is_token: true }
+        params: { exists: true, is_node: true }
+        body: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  # ── BODY AND LET-BINDINGS ─────────────────────────────────────
+
+  desugar_body:
+    description: "Body → nested LetExpr (zero bindings → result Expr; n bindings → n nested LetExpr, innermost body = result)"
+    pattern:
+      node_kind: "Body"
+      fields:
+        result: { exists: true, is_node: true }
+    replacement:
+      nf_node: "fold_body_to_let_chain"
+      nf_fields: "preserve_all"
+
+  desugar_let_binding:
+    description: "LetBinding — preserve name and value"
+    pattern:
+      node_kind: "LetBinding"
+      fields:
+        name: { exists: true, is_token: true }
+        value: { exists: true, is_node: true }
+    replacement:
+      nf_node: "LetBinding"
+      nf_fields:
+        name: { from: "token:name" }
+        value: { from: "node:value" }
+
+  desugar_let_decl:
+    description: "Top-level LetDecl — pass through"
+    pattern:
+      node_kind: "LetDecl"
+      fields:
+        name: { exists: true, is_token: true }
+        value: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  # ── TYPED PARAMETER NODES (surface-only) ─────────────────────
+
+  strip_typed_param_list:
+    description: "TypedParamList — pass through for FnDecl"
+    pattern:
+      node_kind: "TypedParamList"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_typed_param_rest:
+    description: "TypedParamRest — pass through param child"
+    pattern:
+      node_kind: "TypedParamRest"
+      fields:
+        param: { exists: true, is_node: true }
+    replacement:
+      nf_node: "TypedParamRest"
+      nf_fields:
+        param: { from: "node:param" }
+
+  strip_typed_param:
+    description: "TypedParam — keep name and normalized type_expr for lowering"
+    pattern:
+      node_kind: "TypedParam"
+      fields:
+        name: { exists: true, is_token: true }
+        type_expr: { exists: true, is_node: true }
+    replacement:
+      nf_node: "TypedParam"
+      nf_fields:
+        name: { from: "token:name" }
+        type_expr: { from: "node:type_expr" }
+
+  # ── TYPE EXPRESSION NODES (surface-only) ─────────────────────
+
+  strip_value_type_args:
+    description: "ValueTypeArgs — pass through (type tags stripped at TypeExpr level)"
+    pattern:
+      node_kind: "ValueTypeArgs"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_type_expr:
+    description: "Strip TypeExpr wrapper — unwrap to inner type variant"
+    pattern:
+      node_kind: "TypeExpr"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields: "preserve_all"
+
+  strip_value_type_expr:
+    description: "ValueTypeExpr — pass through (compound type tag, surface-only)"
+    pattern:
+      node_kind: "ValueTypeExpr"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_valuelist_type_expr:
+    description: "ValueListTypeExpr — pass through (list type tag, surface-only)"
+    pattern:
+      node_kind: "ValueListTypeExpr"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_prim_type_expr:
+    description: "PrimTypeExpr — pass through (primitive type name, surface-only)"
+    pattern:
+      node_kind: "PrimTypeExpr"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  strip_type_expr_rest:
+    description: "TypeExprRest — pass through (comma-separated type arg tail)"
+    pattern:
+      node_kind: "TypeExprRest"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  # ── CORE EXPRESSION DESUGARING ────────────────────────────────
+
+  normalize_determine_expr:
+    description: "DetermineExpr — identity (zero-operand determinacy gate)"
+    pattern:
+      node_kind: "DetermineExpr"
+    replacement:
+      nf_node: "DetermineExpr"
+      nf_fields: {}
+
+  desugar_if_expr:
+    description: "IfExpr → NF IfExpr (canonical branch names: then_branch/else_branch)"
+    pattern:
+      node_kind: "IfExpr"
+      fields:
+        condition: { exists: true, is_node: true }
+        then_branch: { exists: true, is_node: true }
+        else_branch: { exists: true, is_node: true }
+    replacement:
+      nf_node: "IfExpr"
+      nf_fields:
+        condition: { from: "node:condition" }
+        then_branch: { from: "node:then_branch" }
+        else_branch: { from: "node:else_branch" }
+
+  desugar_value_construct:
+    description: "ValueConstructExpr — pass through; type args are surface-only"
+    pattern:
+      node_kind: "ValueConstructExpr"
+      fields:
+        args: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  desugar_valuelist_construct:
+    description: "ValueListConstructExpr — pass through; element type is surface-only"
+    pattern:
+      node_kind: "ValueListConstructExpr"
+      fields:
+        args: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  desugar_call_expr:
+    description: "CallExpr → NF CallExpr with name token and ArgList node"
+    pattern:
+      node_kind: "CallExpr"
+      fields:
+        name: { exists: true, is_token: true }
+        args: { exists: true, is_node: true }
+    replacement:
+      nf_node: "CallExpr"
+      nf_fields:
+        name: { from: "token:name" }
+        args: { from: "node:args" }
+
+  normalize_ident:
+    description: "Bare IDENT variant in Expr → VarRef"
+    pattern:
+      node_kind: "Expr"
+      fields:
+        variant: { exists: true, is_token: true }
+    replacement:
+      nf_node: "VarRef"
+      nf_fields:
+        name: { from: "token:variant" }
+
+  desugar_expr_variant:
+    description: "Unwrap Expr variant (node case — must come after normalize_ident)"
+    pattern:
+      node_kind: "Expr"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields: "preserve_all"
+
+  # ── LITERALS ─────────────────────────────────────────────────
+
+  normalize_int_lit:
+    description: "IntLit — pass through with token value"
+    pattern:
+      node_kind: "IntLit"
+      fields:
+        value: { exists: true, is_token: true }
+    replacement:
+      nf_node: "IntLit"
+      nf_fields:
+        value: { from: "token:value" }
+
+  normalize_text_lit:
+    description: "TextLit — pass through with token value"
+    pattern:
+      node_kind: "TextLit"
+      fields:
+        value: { exists: true, is_token: true }
+    replacement:
+      nf_node: "TextLit"
+      nf_fields:
+        value: { from: "token:value" }
+
+  normalize_bool_lit:
+    description: "BoolLit — pass through with token value (KW_TRUE or KW_FALSE)"
+    pattern:
+      node_kind: "BoolLit"
+      fields:
+        value: { exists: true, is_token: true }
+    replacement:
+      nf_node: "BoolLit"
+      nf_fields:
+        value: { from: "token:value" }
+
+  normalize_unit_lit:
+    description: "UnitLit — pass through (no fields)"
+    pattern:
+      node_kind: "UnitLit"
+    replacement:
+      nf_node: "UnitLit"
+      nf_fields: {}
+
+  # ── ARG AND PARAM HELPERS ─────────────────────────────────────
+
+  normalize_arg_list:
+    description: "ArgList — preserve args list"
+    pattern:
+      node_kind: "ArgList"
+      fields:
+        args: { exists: true, is_list: true }
+    replacement:
+      nf_node: "ArgList"
+      nf_fields:
+        args: { from: "nodes:args" }
+
+  normalize_arg_list_rest:
+    description: "ArgListRest — pass through arg node"
+    pattern:
+      node_kind: "ArgListRest"
+      fields:
+        arg: { exists: true, is_node: true }
+    replacement:
+      nf_node: "ArgListRest"
+      nf_fields:
+        arg: { from: "node:arg" }
+
+  normalize_empty:
+    description: "Empty — identity (no-arg sentinels)"
+    pattern:
+      node_kind: "Empty"
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}

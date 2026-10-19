@@ -19,13 +19,24 @@
 // - Registry interaction
 // - Semantic interpretation
 
-pub mod nf_spec_loader;
+// nf_spec_loader deleted: was a WAVE NEXT placeholder stub (load_from_file
+// silently returned an empty NfSpec with no content). Zero callers outside
+// this module. Removed in Bundle 3 quality audit (2026-06-08).
+//
+// nf_validation migrated here from src/normalisation/ in Bundle 4 (2026-06-08).
+// src/normalisation/ (Phase 3d legacy) has been deleted.
+pub mod desugaring;
+pub mod expand_engine;
+pub mod nf_validation;
 pub mod normalize_engine;
 pub mod rules_loader;
 
 use crate::frontend::schema_ast::SchemaAstNode;
 use crate::nf_ast::{NfAst, NfVersion};
-use crate::normalisation::nf_validation::{validate_nf, NfValidationError};
+use crate::normalize::nf_validation::{
+    validate_h1_single_assignment, validate_nf,
+    validate_value_construct_types, NfValidationError,
+};
 use std::error::Error;
 use std::fmt;
 use std::path::Path;
@@ -161,6 +172,10 @@ impl NormalizationContext {
 
         // Validate NF compliance
         validate_nf(&normalized_ast)?;
+        // G2: value construction type-tag/literal compatibility (pre-lower).
+        validate_value_construct_types(&normalized_ast)?;
+        // H1 single-assignment: no name may be bound twice in the same LetExpr chain.
+        validate_h1_single_assignment(&normalized_ast)?;
 
         // Construct NfAst with validation guarantee
         let nf_version = match self.nf_spec_version.as_str() {
@@ -325,18 +340,3 @@ mod tests {
 // CONVENIENCE API
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Normalize AST using default spec paths
-///
-/// Loads NF spec and rules from default locations and normalizes the AST.
-///
-/// # Default Paths
-/// - NF spec: `core_spec/NORMAL_FORM_SPEC_0.1.yaml`
-/// - Rules: `core_spec/NORMALIZATION_RULES_0.1.yaml`
-///
-/// For custom paths, use `NormalizationContext::load` and `normalize`.
-pub fn normalize_with_defaults(ast: SchemaAstNode) -> NormalizationResult {
-    let rules_path = Path::new("core_spec/NORMALIZATION_RULES_0.1.yaml");
-
-    let ctx = NormalizationContext::load(rules_path)?;
-    ctx.normalize(ast)
-}

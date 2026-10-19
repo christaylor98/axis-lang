@@ -37,6 +37,20 @@ impl From<serde_yaml::Error> for LoadError {
 pub fn load_spec(path: &Path) -> Result<LexerSpec, LoadError> {
     let content = fs::read_to_string(path)?;
     let spec: LexerSpec = serde_yaml::from_str(&content)?;
+    if let Some(layout) = &spec.lexer.layout {
+        if layout.mode != "offside" {
+            return Err(LoadError {
+                message: format!("layout.mode '{}' is not defined; the only mode is 'offside'", layout.mode),
+            });
+        }
+        for name in [&layout.newline, &layout.indent, &layout.dedent] {
+            if spec.lexer.punctuation.contains(name) {
+                return Err(LoadError {
+                    message: format!("layout token name '{}' is also declared as punctuation", name),
+                });
+            }
+        }
+    }
     Ok(spec)
 }
 

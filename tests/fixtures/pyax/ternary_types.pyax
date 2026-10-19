@@ -1,0 +1,6 @@
+# expect-exit: 0
+# a ternary with one type on both sides
+def main(args: list[str]) -> None:
+    n = len(args)
+    x = n if n > 1 else 0
+    print(x, [] if n > 5 else [1, 2], "a" if n else "b")

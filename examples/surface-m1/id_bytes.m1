@@ -1,0 +1,3 @@
+fn id_bytes(b: Bytes) -> Bytes {
+  b
+}

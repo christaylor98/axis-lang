@@ -1,0 +1,6 @@
+// Matrix fixture: FnDecl / Body(0-binding) / VarRef
+// Single function, zero let-bindings, VarRef body.
+// Shared by matrix rows: FnDecl, Body(0), VarRef.
+fn test(x: Bool) -> Bool {
+  x
+}

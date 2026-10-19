@@ -1,0 +1,15 @@
+// AI3 fixture: let-bindings inside if-branches, each branch closed by a BARE
+// tail expression.
+// Exercises BranchBody with a non-empty binding list — the unshared branch rule
+// is M1's Body verbatim, so `let` in a branch still works and still scopes to
+// the taken arm; only the tail differs from the function body's.
+fn clamp(n: Int) -> Int {
+  let zero = Int(0);
+  return if int_lt(n, zero) {
+    let flipped = int_sub(zero, n);
+    flipped
+  } else {
+    let same = int_add(n, zero);
+    same
+  };
+}

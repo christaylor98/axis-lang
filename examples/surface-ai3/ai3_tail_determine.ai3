@@ -1,0 +1,4 @@
+// AI3 fixture: `determine` in tail position — the determinacy discharge gate.
+fn f(x: Bool) -> Bool {
+  return determine;
+}

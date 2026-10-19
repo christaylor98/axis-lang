@@ -1,0 +1,15 @@
+// Core IR 0.6 (axis-core-ir-0.6.md): nodes come out in source order, and each sits in the span of the branch it
+// was written in. tests/core_ir_06_spans.rs compiles this file. `tick(n)` is an effect, so it is never shared;
+// its argument says where it was written.
+fn order(c: Bool, d: Bool) -> Int {
+  let a = tick(Int(1))
+  let b = if c { tick(Int(2)) } else { let e = tick(Int(3))
+    if d { tick(Int(4)) } else { tick(Int(5)) } }
+  let f = bool_and(c, int_eq(tick(Int(6)), Int(0)))
+  let g = if bool_or(d, int_eq(tick(Int(7)), Int(0))) { tick(Int(8)) } else { tick(Int(9)) }
+  let s = if c { pick(Int(11)) } else { pick(Int(11)) }
+  let t = pick(Int(12))
+  let u = if d { pick(Int(12)) } else { Int(0) }
+  let v = pick(Int(11))
+  tick(Int(10))
+}

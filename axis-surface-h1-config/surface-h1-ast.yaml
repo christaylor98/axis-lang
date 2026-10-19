@@ -14,9 +14,9 @@ nodes:
       name:
         from: token(IDENT)
       params:
-        from: child(2)
+        from: child(3)
       body:
-        from: child(4)
+        from: child(5)
 
   ParamList:
     fields:
@@ -66,7 +66,7 @@ nodes:
 
   BlockContent:
     fields:
-      stmts:
+      items:
         from: children(0..)
 
   Stmt:
@@ -74,7 +74,7 @@ nodes:
       variant:
         from: child(0)
 
-  LetStmt:
+  AssignStmt:
     fields:
       name:
         from: token(IDENT)
@@ -302,10 +302,43 @@ nodes:
       variant:
         from: child(0)
 
-  Literal:
+  IntLit:
     fields:
       value:
-        from: child(0)
+        from: child(2)
+
+  FloatLit:
+    fields:
+      value:
+        from: child(2)
+
+  DecimalLit:
+    fields:
+      value:
+        from: child(2)
+
+  TextLit:
+    fields:
+      value:
+        from: child(2)
+
+  BoolLit:
+    fields:
+      value:
+        from: child(2)
+
+  UnitLit:
+    fields: {}
+
+  ValueConstructExpr:
+    fields:
+      args:
+        from: child(2)
+
+  ListConstructExpr:
+    fields:
+      args:
+        from: child(2)
 
   Empty:
     fields: {}

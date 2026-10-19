@@ -1,19 +1,16 @@
 registry axis-wave3-test 0.1
 
-fn det0
-arity 0
-deterministic true
-profile all
-end
+function det0
+  arity 0
+  deterministic true
+  profiles all
 
-fn rand0
-arity 0
-deterministic false
-profile all
-end
+function rand0
+  arity 0
+  deterministic false
+  profiles all
 
-fn add
-arity 2
-deterministic true
-profile all
-end
+function add
+  arity 2
+  deterministic true
+  profiles all

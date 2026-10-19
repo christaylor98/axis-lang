@@ -1,0 +1,6 @@
+// Matrix fixture: Body(1-binding)
+// One let-binding: body folds to LetExpr{name:x, value:VarRef(a), body:VarRef(x)}.
+fn f(a: Bool) -> Bool {
+  let x = a
+  x
+}

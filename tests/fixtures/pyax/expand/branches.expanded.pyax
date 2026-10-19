@@ -1,0 +1,19 @@
+def grade(score: Int) -> Text:
+    if int_gte(score, 90):
+        label = "A"
+        __d_1 = io_println(label)
+        return str_concat(label, int_to_str(py_floordiv(score, 10)))
+    else:
+        if int_gte(score, 75):
+            label = "B"
+            __d_2 = io_println(label)
+            return str_concat(label, int_to_str(py_floordiv(score, 10)))
+        else:
+            label = "C"
+            __d_3 = io_println(label)
+            return str_concat(label, int_to_str(py_floordiv(score, 10)))
+
+def pyax_main(args: ValueList) -> Int:
+    __d_1 = io_println(grade(81))
+    return 0
+

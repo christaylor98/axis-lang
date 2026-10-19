@@ -1,0 +1,34 @@
+# expect-exit: 0
+"""Module docstring: ignored, like Python."""
+LIMIT = 3
+GREETING: str = 'hi'
+
+
+def top_pairs(counts: dict[str, int]) -> list[tuple[int, str]]:
+    """Most frequent first; ties alphabetical."""
+    pairs = []
+    for w, c in counts.items():
+        pairs.append((-c, w))
+    return sorted(pairs)[:LIMIT]
+
+
+def main(args: list[str]) -> int:
+    counts = {"b": 2, "a": 2, "c": 5, "d": 1}
+    for neg, w in top_pairs(counts):
+        print(w, -neg, sep=": ")
+    xs = [3, 1, 2]
+    print(sorted(xs, reverse=True), sorted(["b", "c", "a"], reverse=True))
+    ys = [5, 4, 6]
+    ys.sort()
+    ys.reverse()
+    first = ys.pop(0)
+    print(first, ys, [1, 2] == [1, 2], [1] != [1, 2])
+    pairs = [(2, "b"), (1, "z"), (2, "a"), (-5, "q")]
+    pairs.sort(reverse=True)
+    print(pairs)
+    print(GREETING, end="")
+    print(" world", LIMIT, end="!\n")
+    for c in "ab" + "c":
+        print(c, end=" ")
+    print()
+    return 0

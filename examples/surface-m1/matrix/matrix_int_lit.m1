@@ -1,0 +1,5 @@
+// Matrix fixture: INT_LIT
+// Integer literal in body position. No params (TypedParamList = Empty).
+fn f() -> Int {
+  Int(42)
+}

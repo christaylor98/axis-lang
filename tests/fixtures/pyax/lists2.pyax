@@ -1,0 +1,34 @@
+# expect-exit: 0
+# lists: first-store rule, append, index, negative index, xs[i] = v, pop,
+# enumerate, zip, comprehensions, sorted/min/max/sum, `in`, print(list)
+def evens(xs: list[int]) -> list[int]:
+    out = []
+    for x in xs:
+        if x % 2 == 0:
+            out.append(x)
+    return out
+
+
+def main(args: list[str]) -> int:
+    xs = [5, 3, 8, 1, 9, 2]
+    print(evens(xs))
+    print(str(xs[0]) + " " + str(xs[-1]) + " " + str(len(xs)))
+    ys = xs.copy()
+    ys[1] = 30
+    last = ys.pop()
+    print(ys)
+    print(str(last))
+    squares = [x * x for x in xs if x > 2]
+    print(squares)
+    print(sorted(xs))
+    print(str(min(xs)) + " " + str(max(xs)) + " " + str(sum(xs)))
+    print(str(8 in xs) + " " + str(7 in xs))
+    for i, x in enumerate(xs):
+        if i < 2:
+            print(str(i) + ":" + str(x))
+    names = ["a", "b", "c"]
+    for n, v in zip(names, xs):
+        print(n + "=" + str(v))
+    print(names)
+    total = sum(x for x in xs if x < 5)
+    return total

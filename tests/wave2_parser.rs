@@ -1,5 +1,5 @@
-use axis_lang_lab::frontend::parser::parse;
-use axis_lang_lab::frontend::parser_lex::lex;
+use axis_lang::frontend::parser::parse;
+use axis_lang::frontend::parser_lex::lex;
 
 #[test]
 fn parse_simple_if() {
@@ -8,10 +8,10 @@ fn parse_simple_if() {
     let ast = parse(&tokens).expect("parse failed");
 
     match &ast.body {
-        axis_lang_lab::frontend::ast::FunctionBody::Block(block) => {
+        axis_lang::frontend::ast::FunctionBody::Block(block) => {
             assert_eq!(block.exprs.len(), 1);
             match &block.exprs[0] {
-                axis_lang_lab::frontend::ast::Expr::If { .. } => {}
+                axis_lang::frontend::ast::Expr::If { .. } => {}
                 _ => panic!("expected If expression"),
             }
         }
@@ -26,13 +26,13 @@ fn parse_nested_if() {
     let ast = parse(&tokens).expect("parse failed");
 
     match &ast.body {
-        axis_lang_lab::frontend::ast::FunctionBody::Block(block) => {
+        axis_lang::frontend::ast::FunctionBody::Block(block) => {
             assert_eq!(block.exprs.len(), 1);
             match &block.exprs[0] {
-                axis_lang_lab::frontend::ast::Expr::If { then_block, .. } => {
+                axis_lang::frontend::ast::Expr::If { then_block, .. } => {
                     assert_eq!(then_block.exprs.len(), 1);
                     match &then_block.exprs[0] {
-                        axis_lang_lab::frontend::ast::Expr::If { .. } => {}
+                        axis_lang::frontend::ast::Expr::If { .. } => {}
                         _ => panic!("expected nested If expression"),
                     }
                 }
@@ -50,10 +50,10 @@ fn parse_if_in_block() {
     let ast = parse(&tokens).expect("parse failed");
 
     match &ast.body {
-        axis_lang_lab::frontend::ast::FunctionBody::Block(block) => {
+        axis_lang::frontend::ast::FunctionBody::Block(block) => {
             assert_eq!(block.exprs.len(), 3);
             match &block.exprs[1] {
-                axis_lang_lab::frontend::ast::Expr::If { .. } => {}
+                axis_lang::frontend::ast::Expr::If { .. } => {}
                 _ => panic!("expected If expression at position 1"),
             }
         }

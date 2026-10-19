@@ -1,0 +1,5 @@
+# expect-error: neg_after_return.pyax:5:5: expand error
+# expect-error: comes after a `return`
+def main(args: list[str]) -> int:
+    return 1
+    print("never")

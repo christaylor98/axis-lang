@@ -1,0 +1,5 @@
+// AI3 NEGATIVE: two returns in one body. Exactly one is admitted.
+fn n(a: Int) -> Int {
+  return a;
+  return a;
+}

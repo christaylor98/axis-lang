@@ -1,0 +1,5 @@
+// M1 end-to-end IfExpr lowering fixture.
+// Single-param function; all three IfExpr branches are VarRef.
+fn decide(flag: Bool) -> Bool {
+  if flag { flag } else { flag }
+}

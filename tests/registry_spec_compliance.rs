@@ -5,7 +5,7 @@
 // 2. Legacy/incorrect syntax fails loudly
 // 3. Non-empty registry producing 0 entries fails loudly
 
-use axis_lang_lab::registry::Registry;
+use axis_lang::registry::Registry;
 
 #[test]
 fn test_spec_compliant_registry_parses() {

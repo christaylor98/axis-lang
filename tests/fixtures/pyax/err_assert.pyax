@@ -1,0 +1,5 @@
+# expect-exit: 3
+def main(args: list[str]) -> int:
+    xs = [1, 2]
+    assert len(xs) == 3, "need three"
+    return 0

@@ -1,0 +1,20 @@
+# expect-exit: 0
+# slices, f-strings, single-quoted strings, multi-argument print
+def is_palindrome(s: str) -> bool:
+    return s == s[::-1]
+
+
+def main(args: list[str]) -> int:
+    xs = [10, 20, 30, 40, 50]
+    print(xs[1:3], xs[:2], xs[3:], xs[-2:], xs[:-3], xs[::-1])
+    print(xs[10:], xs[2:1])
+    s = 'hello, world'
+    print(s[0:5], s[-5:], s[7:100], s[:0] + "|")
+    print(is_palindrome("racecar"), is_palindrome('python'))
+    n = 7
+    print(f"n={n}, n*2={n * 2}, {s[:5]}!")
+    print(f'{{literal}} and {len(xs)} items')
+    name = "it's"
+    print('quote: "' + name + '"')
+    print("a", 1, True)
+    return len(s[2:6])

@@ -1,0 +1,3 @@
+// AI3 fixture: top-level LetDecl with the optional `;`.
+// LetDecl has no Body, so it takes no `return`.
+let x = Int(42);

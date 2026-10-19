@@ -1,0 +1,67 @@
+// Core IR 0.5 registry fixture (Phase 1).
+//
+// Projection-only: this text is NEVER hashed. Lowering produces canonical
+// binary records (Registry Format §§3–6). Function identities are AUTHORED
+// literally; the loader never mints. Names, comments, and authoring order
+// are stripped on lowering.
+
+registry example 0.1
+
+// ─────────── types ───────────
+type Unit  = prim unit
+type Bool  = prim bool
+type Int   = prim int
+type Float = prim float
+type Bytes = prim bytes
+type Text  = prim text
+
+type Pair   = product (Int, Int)
+type Tagged = product (Text, Int)
+type Either = sum [ Left(Int) | Right(Bool) | None ]
+
+// ─────────── predicate functions (clauses are predicate-fn identities) ──
+fn is_non_negative
+  identity 0xa110a110a110a110a110a110a110a110a110a110a110a110a110a110a110a110
+  kind leaf
+  in (Int)
+  out Bool
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// ─────────── leaf functions ───────────
+fn add
+  identity 0xadd0add0add0add0add0add0add0add0add0add0add0add0add0add0add0add0
+  kind leaf
+  in (Int, Int)
+  out Int
+  effect pure
+  deterministic true
+  idempotent true
+  disposition batch
+  contract gen 1 [ is_non_negative ]
+end
+
+fn print_line
+  identity 0xb0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0
+  kind leaf
+  in (Text)
+  out Unit
+  effect writes
+  deterministic false
+  idempotent false
+  disposition interactive
+end
+
+// ─────────── a composite (facts pending until graph walker lands) ───────
+fn tag_pair
+  identity 0xc0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0
+  kind composite
+  in (Pair)
+  out Tagged
+  body 0xdeadbeefcafef00ddeadbeefcafef00ddeadbeefcafef00ddeadbeefcafef00d
+end
+
+// ─────────── an admissible implementation of `add` ───────────
+impl add satisfies gen 1 artifact 0x42abcdef42abcdef42abcdef42abcdef42abcdef42abcdef42abcdef42abcdef

@@ -1,0 +1,7 @@
+// Test 4: Value construction
+// Expected: PASS
+
+fn main() {
+  r = Value(Int(9), Text("hello"));
+  r
+}

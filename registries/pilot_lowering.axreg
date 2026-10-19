@@ -1,0 +1,33 @@
+// Core IR 0.5 pilot registry fixture (Phase 3a lowering pilot).
+//
+// Projection-only. Function identities are AUTHORED literally.
+// Two leaf functions whose CCalls the pilot tests resolve against.
+
+registry pilot-lowering 0.5
+
+// ── types ──────────────────────────────────────────────────────────────────
+type Unit = prim unit
+
+// ── leaf functions ─────────────────────────────────────────────────────────
+
+// const_unit: (Unit) -> Unit — the primary call target in pilot tests.
+fn const_unit
+  identity 0x1111111111111111111111111111111111111111111111111111111111111111
+  kind leaf
+  in (Unit)
+  out Unit
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// seq_units: (Unit, Unit) -> Unit — two-arg call; used to test literal sharing.
+fn seq_units
+  identity 0x2222222222222222222222222222222222222222222222222222222222222222
+  kind leaf
+  in (Unit, Unit)
+  out Unit
+  effect pure
+  deterministic true
+  idempotent true
+end

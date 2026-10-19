@@ -5,13 +5,13 @@
 // - No semantic interpretation
 // - Hard errors on schema violations
 
-use axis_lang_lab::frontend::ast_builder::build_generic_ast;
-use axis_lang_lab::frontend::parser_runtime::{ParseNode, ParseTree};
-use axis_lang_lab::frontend::schema_ast::{
+use axis_lang::frontend::ast_builder::build_generic_ast;
+use axis_lang::frontend::parser_runtime::{ParseNode, ParseTree};
+use axis_lang::frontend::schema_ast::{
     project_schema_ast, AstSchema, FieldExtraction, SchemaNodeDef, SchemaValue, SpanRule,
     UnhandledNodeBehavior,
 };
-use axis_lang_lab::frontend::token::{Span, Token, TokenKind};
+use axis_lang::frontend::token::{Span, Token, TokenKind};
 use std::collections::HashMap;
 
 fn token(kind: TokenKind, lexeme: &str, start: usize, end: usize) -> Token {

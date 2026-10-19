@@ -1,0 +1,10 @@
+# expect-exit: 0
+# registry calls typed from the registry: lists convert both ways, results need no annotation
+def add(a: int, b: int) -> int:
+    return a + b
+
+def main() -> None:
+    xs = [1, 2, 3]
+    print(int_list_fold_int(xs, 0, add))
+    words = str_split("a b c", " ")
+    print(words, len(words), list_len(xs) + 1)

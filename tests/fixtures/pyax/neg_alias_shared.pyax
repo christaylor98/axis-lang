@@ -1,0 +1,7 @@
+# expect-error: neg_alias_shared.pyax:6:5:
+# expect-error: `ys` may share its value with `xs`
+def main(args: list[str]) -> int:
+    xs = [1, 2, 3]
+    ys = xs
+    ys.append(4)
+    return len(xs)

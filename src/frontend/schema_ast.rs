@@ -29,9 +29,30 @@
 
 use crate::frontend::ast_builder::{ASTChild, ASTNode};
 use crate::frontend::token::{Span, Token, TokenKind};
-use crate::ir::core_ir::{Annotation, AnnotationValue};
 use std::collections::HashMap;
 use std::fmt;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ANNOTATION MODEL (moved here from ir::core_ir for Phase 3d)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Annotation attached to AST/Core IR nodes
+///
+/// Annotations are data, not behavior. They must never affect semantics or execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Annotation {
+    pub key: String,
+    pub value: AnnotationValue,
+}
+
+/// Value types for annotations
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AnnotationValue {
+    Bool(bool),
+    Int(i64),
+    String(String),
+    Symbol(String),
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // PUBLIC DATA STRUCTURES
@@ -140,6 +161,9 @@ pub enum FieldExtraction {
     /// Extract children from start to len-1 (exclude last child)
     /// Useful for patterns like "items+ <TERMINAL>" where last child is terminal
     ChildrenExcludingLast(usize),
+    /// Extract the last child
+    /// Symmetric counterpart to ChildrenExcludingLast — use in schema as "last_child"
+    LastChild,
     /// Extract token from child node at specific index
     /// Used for postfix parser output where literal nodes have token children
     ChildToken(usize),
@@ -147,6 +171,8 @@ pub enum FieldExtraction {
     Token(TokenKind),
     /// Extract all tokens of specific kind
     Tokens(TokenKind),
+    /// Extract the first terminal token of any kind (used when the kind varies by grammar alternative)
+    FirstToken,
 }
 
 /// Span rule for schema node
@@ -299,6 +325,12 @@ fn extract_field(
             // Determine actual end index (use child count for open-ended ranges)
             let actual_end = end.unwrap_or(ast.children.len());
 
+            // For open-ended ranges (children(N..)), return empty list if N >= len.
+            // This allows binary expression nodes with zero ops to produce empty lists.
+            if end.is_none() && *start >= ast.children.len() {
+                return Ok(SchemaValue::Nodes(vec![]));
+            }
+
             // Extract children in range
             if *start >= ast.children.len()
                 || actual_end > ast.children.len()
@@ -360,14 +392,21 @@ fn extract_field(
 
             let actual_end = ast.children.len() - 1;
 
-            if *start >= actual_end {
+            // start > actual_end means start is past the valid range — genuine error.
+            // start == actual_end means zero items before the last child — return empty list.
+            // This is correct for patterns like Body where zero let-bindings is valid.
+            if *start > actual_end {
                 return Err(SchemaAstError {
                     message: format!(
-                        "children_excluding_last({}) invalid: node '{}' has {} children, range would be empty",
+                        "children_excluding_last({}) invalid: node '{}' has {} children, start is out of range",
                         start, ast.kind, ast.children.len()
                     ),
                     span: ast.span.clone(),
                 });
+            }
+
+            if *start == actual_end {
+                return Ok(SchemaValue::Nodes(vec![]));
             }
 
             let mut nodes = Vec::new();
@@ -394,6 +433,32 @@ fn extract_field(
             }
 
             Ok(SchemaValue::Nodes(nodes))
+        }
+
+        FieldExtraction::LastChild => {
+            // Extract the last child node
+            if ast.children.is_empty() {
+                return Err(SchemaAstError {
+                    message: format!(
+                        "last_child invalid: node '{}' has no children",
+                        ast.kind
+                    ),
+                    span: ast.span.clone(),
+                });
+            }
+            match ast.children.last().unwrap() {
+                ASTChild::Node(child_node) => {
+                    let projected = project_node(child_node, schema)?;
+                    Ok(SchemaValue::Node(Box::new(projected)))
+                }
+                ASTChild::Terminal(token) => Err(SchemaAstError {
+                    message: format!(
+                        "last_child of '{}' is a terminal '{}' — use token() instead",
+                        ast.kind, token.lexeme
+                    ),
+                    span: token.span.clone(),
+                }),
+            }
         }
 
         FieldExtraction::ChildToken(index) => {
@@ -462,6 +527,18 @@ fn extract_field(
             }
 
             Ok(SchemaValue::Tokens(tokens))
+        }
+
+        FieldExtraction::FirstToken => {
+            for child in &ast.children {
+                if let ASTChild::Terminal(token) = child {
+                    return Ok(SchemaValue::Token(token.clone()));
+                }
+            }
+            Err(SchemaAstError {
+                message: format!("first_token: no terminal found in node '{}'", ast.kind),
+                span: ast.span.clone(),
+            })
         }
     }
 }

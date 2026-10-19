@@ -1,9 +1,9 @@
 // AI-1 (RPN) Lexer Tests - Verify spec compliance
 
-use axis_lang_lab::frontend::{lexer_engine, lexspec_load, token::TokenKind};
+use axis_lang::frontend::{lexer_engine, lexspec_load, token::TokenKind};
 use std::path::PathBuf;
 
-fn load_ai1_spec() -> axis_lang_lab::frontend::lexspec::LexerSpec {
+fn load_ai1_spec() -> axis_lang::frontend::lexspec::LexerSpec {
     lexspec_load::load_spec(&PathBuf::from("axis-surface-ai1-config/ai1-rpn-lexer.yaml"))
         .expect("load ai1 lexer spec")
 }

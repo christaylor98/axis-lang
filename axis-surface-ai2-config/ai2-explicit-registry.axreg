@@ -1,5 +1,23 @@
 registry ai2-explicit 0.1
 
-# AI2 Explicit Registry
-# Empty registry for pure expression evaluation
-# No external operators required
+// AI2 Explicit Registry — minimal types and a single registered function
+// for testing function application (ai2-app.ai2).
+
+// ─────────── Type declarations ───────────
+
+type Int  = prim int
+type Bool = prim bool
+
+// ─────────── Functions ───────────
+
+// f: a generic Int→Int leaf used by the application test.
+// Identity: SHA-256("f") per §5b.
+fn f
+  identity 0x252f10c83610ebca1a059c0bae8255eba2f95be4d1d7bcfa89d7248a82d9f111
+  kind leaf
+  in (Int)
+  out Int
+  effect pure
+  deterministic true
+  idempotent false
+end

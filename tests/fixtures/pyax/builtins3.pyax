@@ -1,0 +1,15 @@
+# expect-exit: 0
+# any/all, reversed, divmod, bool(), enumerate(xs, start), list * n, step
+# slices, and more str/list methods
+def main(args: list[str]) -> int:
+    xs = [3, 8, 1, 8, 5]
+    print(any(x > 7 for x in xs), all(x > 0 for x in xs), any([]), all([]))
+    print(list(reversed(xs)), "".join(reversed("abc")), divmod(-7, 2), bool(0), bool("x"))
+    for i, x in enumerate(xs, 1):
+        if i <= 2:
+            print(i, x)
+    print([0] * 3, xs[::2], xs[1::2], xs[::-2], xs[4:0:-1], "abcdefg"[1:6:2])
+    print(xs.count(8), xs.index(1), "  hi  ".lstrip() + "|", "  hi  ".rstrip() + "|")
+    print("a\nb\n".splitlines(), "abcabc".rfind("bc"), "abcabc".index("ca"), "aaaa".count("aa"))
+    print("ab1".isalnum(), "a b".isalnum(), "42".zfill(5), "-7".zfill(4), "x".rjust(3), "x".ljust(3, "-") + "|", "hELLO".capitalize())
+    return 0

@@ -1,0 +1,7 @@
+// AI3 NEGATIVE: `return` followed by a let-binding.
+// `Body: LetBinding* ReturnStmt` makes "exactly one, at the tail" structural —
+// nothing may follow the return.
+fn n(a: Int) -> Int {
+  return a;
+  let x = Int(1);
+}

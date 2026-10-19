@@ -1,0 +1,15 @@
+# A for loop with two state variables, a rebinding, and an early return
+# that travels through the done flag.
+def first_over(xs: list[int], limit: int) -> int:
+    total = 0
+    count = 0
+    for x in xs:
+        total += x
+        count += 1
+        if total > limit:
+            return count
+    return -1
+
+
+def main(args: list[str]) -> int:
+    return first_over([3, 4, 5, 6], 10)

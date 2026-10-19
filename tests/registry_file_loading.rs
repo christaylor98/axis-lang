@@ -3,7 +3,7 @@
 // This test verifies that the load_from_paths method correctly enforces
 // the fail-loud invariant when registry files have content but 0 entries
 
-use axis_lang_lab::registry::Registry;
+use axis_lang::registry::Registry;
 use std::fs;
 use tempfile::TempDir;
 

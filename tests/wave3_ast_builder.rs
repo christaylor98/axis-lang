@@ -6,9 +6,9 @@
 // 3. Deterministic (same input → same output)
 // 4. Happy-path projection works for various grammar patterns
 
-use axis_lang_lab::frontend::ast_builder::{build_generic_ast, ASTChild, ASTNode};
-use axis_lang_lab::frontend::parser_runtime::{ParseNode, ParseTree};
-use axis_lang_lab::frontend::token::{Span, Token, TokenKind};
+use axis_lang::frontend::ast_builder::{build_generic_ast, ASTChild, ASTNode};
+use axis_lang::frontend::parser_runtime::{ParseNode, ParseTree};
+use axis_lang::frontend::token::{Span, Token, TokenKind};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS

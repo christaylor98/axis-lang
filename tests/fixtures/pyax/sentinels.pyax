@@ -1,0 +1,47 @@
+# expect-exit: 0
+# float("inf") / -float("inf") / math.inf as starting values for an int
+# search (pyaxc's rule: the largest / smallest int); a float sentinel that is
+# only ever compared with floats stays a float.
+import math
+
+
+def smallest(xs: list[int]) -> int:
+    best = float("inf")
+    for x in xs:
+        if x < best:
+            best = x
+    return best
+
+
+def largest_gap(xs: list[int]) -> int:
+    gap = -math.inf
+    for i in range(1, len(xs)):
+        if xs[i] - xs[i - 1] > gap:
+            gap = xs[i] - xs[i - 1]
+    return gap
+
+
+def min_ratio(xs: list[float]) -> float:
+    lo = float("inf")
+    for x in xs:
+        lo = min(lo, x / 2)
+    return lo
+
+
+# Found by the phase-3 differential: a sentinel compared against a fresh
+# float("-inf") must see the same int value, or this returns the sentinel.
+def second_largest(xs: list[int]) -> int:
+    max_val = max(xs)
+    second_max = float("-inf")
+    for x in xs:
+        if x < max_val and x > second_max:
+            second_max = x
+    if second_max == float("-inf"):
+        return max_val
+    return second_max
+
+
+def main(args: list[str]) -> int:
+    print(second_largest([5, 5]), second_largest([4]), second_largest([3, 9, 7]))
+    print(smallest([5, 3, 8]), largest_gap([1, 4, 6, 15]), min_ratio([3.0, 1.0]))
+    return 0

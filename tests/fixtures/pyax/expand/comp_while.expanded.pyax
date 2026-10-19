@@ -1,0 +1,38 @@
+def scaled(xs: ValueList, k: Int) -> ValueList:
+    return flatten(list_make(ctor_field(fold(xs, value_make(list_make(), k), __scaled_comp1), 0)))
+
+def __scaled_comp1(__acc: Value, __item: Value) -> Value:
+    __out_2 = flatten(list_make(ctor_field(__acc, 0)))
+    __k_3 = value_to_int(ctor_field(__acc, 1))
+    __x_4 = value_to_int(__item)
+    return (value_make(value_list_push(__out_2, int_mul(__x_4, __k_3)), __k_3) if int_gt(__x_4, 1) else value_make(__out_2, __k_3))
+
+def halvings(n: Int) -> Int:
+    steps = 0
+    __st_8 = loop_while(value_make(n, steps), __halvings_cond1, __halvings_loop1, 100000000)
+    if __halvings_cond1(__st_8):
+        return fail("PyAx: a while loop ran past 100000000 iterations")
+    else:
+        __n_9 = value_to_int(ctor_field(__st_8, 0))
+        __steps_10 = value_to_int(ctor_field(__st_8, 1))
+        return __steps_10
+
+def __halvings_cond1(__acc: Value) -> Bool:
+    __n_2 = value_to_int(ctor_field(__acc, 0))
+    __steps_3 = value_to_int(ctor_field(__acc, 1))
+    return int_gt(__n_2, 1)
+
+def __halvings_loop1(__acc: Value) -> Value:
+    __n_4 = value_to_int(ctor_field(__acc, 0))
+    __steps_5 = value_to_int(ctor_field(__acc, 1))
+    __n_6 = py_floordiv(__n_4, 2)
+    __steps_7 = int_add(__steps_5, 1)
+    return value_make(__n_6, __steps_7)
+
+def pyax_main(args: ValueList) -> Int:
+    __d_2 = io_println(str_concat(str_concat("[", str_join(flatten(list_make(ctor_field(fold(scaled(list_make(1, 2, 3), 10), value_make(list_make()), __main_repr1), 0))), ", ")), "]"))
+    return halvings(1000)
+
+def __main_repr1(__acc: Value, __item: Value) -> Value:
+    return value_make(value_list_push(flatten(list_make(ctor_field(__acc, 0))), int_to_str(value_to_int(__item))))
+

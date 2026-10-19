@@ -1,11 +1,7 @@
-// Test 2: Function call
-// This tests: FnDecl, CallExpr, application
-
-fn inc() {
-  1
-}
+// Test 2: Assignment and variable reference
+// Expected: PASS
 
 fn main() {
-  inc()
+  x = Int(12);
+  x
 }
-

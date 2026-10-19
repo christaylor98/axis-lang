@@ -238,6 +238,16 @@ fn parse_from_specifier(
         return Ok(FieldExtraction::ChildrenExcludingLast(start));
     }
 
+    // last_child
+    if spec == "last_child" {
+        return Ok(FieldExtraction::LastChild);
+    }
+
+    // first_token — first terminal of any kind (kind varies by grammar alternative)
+    if spec == "first_token" {
+        return Ok(FieldExtraction::FirstToken);
+    }
+
     // token(TOKEN_KIND)
     if spec.starts_with("token(") && spec.ends_with(')') {
         let inner = &spec[6..spec.len() - 1];
@@ -265,6 +275,7 @@ fn parse_token_kind(s: &str) -> Result<TokenKind, SchemaLoadError> {
     match s {
         "IDENT" => Ok(TokenKind::Ident),
         "INT_LIT" => Ok(TokenKind::IntLit),
+        "FLOAT_LIT" => Ok(TokenKind::FloatLit),
         "BOOL_LIT" => Ok(TokenKind::BoolLit),
         "STRING_LIT" => Ok(TokenKind::StringLit),
         "UNIT_LIT" => Ok(TokenKind::UnitLit),

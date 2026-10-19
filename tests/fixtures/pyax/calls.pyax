@@ -1,0 +1,34 @@
+# expect-exit: 0
+# default parameter values, keyword arguments to own functions, insert,
+# first-store through `in`, a -inf sentinel fed through max()
+def pad(s: str, width: int = 6, fill: str = ".") -> str:
+    while len(s) < width:
+        s = fill + s
+    return s
+
+
+def best_run(xs: list[int]) -> int:
+    best = -float("inf")
+    cur = 0
+    for x in xs:
+        cur = max(cur + x, x)
+        best = max(best, cur)
+    return best
+
+
+def unique(xs: list[int]) -> list[int]:
+    seen = []
+    for x in xs:
+        if x not in seen:
+            seen.append(x)
+    return seen
+
+
+def main(args: list[str]) -> int:
+    print(pad("7"), pad("42", 4), pad("x", fill="-"), pad(width=3, s="ab"))
+    stack = [1, 2, 3]
+    stack.insert(1, 99)
+    stack.insert(-1, 7)
+    stack.insert(100, 5)
+    print(stack, unique([3, 1, 3, 2, 1]), best_run([-2, 1, -3, 4, -1, 2, 1, -5, 4]))
+    return 0

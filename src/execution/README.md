@@ -1,6 +1,6 @@
 # Wave 6 Execution Substrate
 
-Core IR interpreter and execution layer for Axis Language Lab.
+Core IR interpreter and execution layer for Axis Lang.
 
 ---
 
@@ -17,9 +17,9 @@ Wave 6 implements the **execution substrate** that interprets Core IR and produc
 ### Basic Usage
 
 ```rust
-use axis_lang_lab_working::ir::core_ir;
-use axis_lang_lab_working::execution::wave6::{eval_core_ir, EvalContext};
-use axis_lang_lab_working::registry::Registry;
+use axis_lang::ir::core_ir;
+use axis_lang::execution::wave6::{eval_core_ir, EvalContext};
+use axis_lang::registry::Registry;
 
 // Create execution context with registry
 let registry = Registry::load_active().unwrap();

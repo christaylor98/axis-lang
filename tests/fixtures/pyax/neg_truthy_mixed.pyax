@@ -1,0 +1,6 @@
+# expect-error: neg_truthy_mixed.pyax:5:13:
+# expect-error: `and` between int and str has no single type as a value
+def main(args: list[str]) -> int:
+    n = 1
+    print(n and "s")
+    return 0

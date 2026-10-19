@@ -1,0 +1,47 @@
+// fnref_test — verification registry for AXIS_FN_REF_ARG_VERIFY_V1.
+//
+// Declares two foreign fns:
+//   - apply_handler(Fn): Unit — takes a fn-reference parameter
+//   - consume_unit(Unit): Unit — takes a Unit (used in misplaced-fn-ref negative)
+//
+// Per the Core IR 0.5 design (axis_core_ir_0_5.capnp lines 50-58, 178-186):
+//   a fn-ref is a typed constant pool entry whose defHash is the Fn type and
+//   whose 32-byte payload is the target fn's minted identity hash.
+//
+// Identities are minted per §5b: SHA-256 of the function name in UTF-8.
+//   echo -n "apply_handler" | sha256sum
+//     → 5c5115a90d7a49eced13fb4486a389ed1cbb0079c0daa7af8aaddad7518cf8b1
+//   echo -n "consume_unit"  | sha256sum
+//     → 88b46e161c5dc09ed434056860682bd344f63595fc6f6aebe1c462880c374e13
+
+registry fnref_test 0.1
+
+// Unit, Fn: owned by registries/pilot_lowering.axreg and
+// axis-surface-m1-config/m1-registry.axreg respectively — both are co-fed
+// with this file in every current invocation, so they are not redeclared
+// here (see cli_util::load_and_merge_registries).
+
+fn apply_handler
+  identity 0x5c5115a90d7a49eced13fb4486a389ed1cbb0079c0daa7af8aaddad7518cf8b1
+  kind     leaf
+  in       (Fn)
+  out      Unit
+  effect   fullIo
+  deterministic false
+  idempotent    false
+  // The `in (Fn)` clause alone says only "some fn-ref"; every fn-ref pool
+  // entry shares one def_hash, so without this line the verifier admits a
+  // callee of any arity, argument type, or return type. `apply_handler`
+  // applies its handler to one Int and discards the Unit it returns.
+  callback 0 (Int) -> Unit
+end
+
+fn consume_unit
+  identity 0x88b46e161c5dc09ed434056860682bd344f63595fc6f6aebe1c462880c374e13
+  kind     leaf
+  in       (Unit)
+  out      Unit
+  effect   pure
+  deterministic true
+  idempotent    true
+end

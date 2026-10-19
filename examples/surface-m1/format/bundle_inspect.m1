@@ -1,0 +1,10 @@
+-- PLACEHOLDER — M1 parsing of .axbi bundles is deferred.
+--
+-- The single bridge primitive `axbi_parse(data: ValueList) -> Value` returns a
+-- fully-structured Value tree.  M1 programs that navigate the tree using
+-- standard list/tuple accessors (list_get, tuple_get, ctor_tag, etc.) will live
+-- here once those accessors are wired to M1-callable registry entries.
+--
+-- See: axis-codegen-bridge-rs/src/runtime/axbi.rs
+--      axis-codegen-bridge-rs/registry/axis-codegen-bridge.axreg  (AXBI_PARSE_V1)
+--      core_ir_spec/axbi-m1-bridge-spec.md

@@ -1,0 +1,4 @@
+// Matrix fixture: KW_TRUE (bool true literal)
+fn f() -> Bool {
+  Bool(true)
+}

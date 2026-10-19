@@ -1,0 +1,4 @@
+// AI3 fixture: Bool literal tail.
+fn f() -> Bool {
+  return Bool(true);
+}

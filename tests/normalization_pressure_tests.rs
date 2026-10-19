@@ -14,9 +14,9 @@
 // - H1: 7/7 tests (transparent unwrapping, validation, determinism)
 // - AI1: 7/7 tests (identity preservation, validation, determinism)
 
-use axis_lang_lab::frontend::schema_ast::{SchemaAstNode, SchemaValue};
-use axis_lang_lab::frontend::token::{Span, Token, TokenKind};
-use axis_lang_lab::normalize::{NormalizationContext, NormalizationError};
+use axis_lang::frontend::schema_ast::{SchemaAstNode, SchemaValue};
+use axis_lang::frontend::token::{Span, Token, TokenKind};
+use axis_lang::normalize::{NormalizationContext, NormalizationError};
 use std::collections::HashMap;
 use std::path::Path;
 

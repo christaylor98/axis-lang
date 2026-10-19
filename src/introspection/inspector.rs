@@ -12,7 +12,7 @@
 use crate::frontend::token::Span;
 use crate::introspection::provenance::{ProvenanceAnnotation, ProvenanceNamespace};
 use crate::introspection::trace_graph::{TraceGraph, TraceNode, TraceNodeId, TraceNodeKind};
-use crate::ir::core_ir::Annotation;
+use crate::frontend::schema_ast::Annotation;
 use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -312,7 +312,7 @@ impl Inspector {
             .iter()
             .find(|a| a.key.ends_with(".rule"))
             .and_then(|a| match &a.value {
-                crate::ir::core_ir::AnnotationValue::String(s) => Some(s.clone()),
+                crate::frontend::schema_ast::AnnotationValue::String(s) => Some(s.clone()),
                 _ => None,
             });
 
@@ -320,7 +320,7 @@ impl Inspector {
             .iter()
             .find(|a| a.key.ends_with(".phase"))
             .and_then(|a| match &a.value {
-                crate::ir::core_ir::AnnotationValue::String(s) => Some(s.clone()),
+                crate::frontend::schema_ast::AnnotationValue::String(s) => Some(s.clone()),
                 _ => None,
             });
 
@@ -328,7 +328,7 @@ impl Inspector {
             .iter()
             .find(|a| a.key.ends_with(".source_node_id"))
             .and_then(|a| match &a.value {
-                crate::ir::core_ir::AnnotationValue::Int(i) => Some(*i as u64),
+                crate::frontend::schema_ast::AnnotationValue::Int(i) => Some(*i as u64),
                 _ => None,
             });
 
@@ -376,7 +376,7 @@ impl Inspector {
         annotations: &crate::introspection::provenance::ProvenanceAnnotationSet,
     ) -> Option<String> {
         annotations.get("source.file").and_then(|a| match &a.value {
-            crate::ir::core_ir::AnnotationValue::String(s) => Some(s.clone()),
+            crate::frontend::schema_ast::AnnotationValue::String(s) => Some(s.clone()),
             _ => None,
         })
     }
@@ -386,7 +386,7 @@ impl Inspector {
         annotations: &crate::introspection::provenance::ProvenanceAnnotationSet,
     ) -> Option<String> {
         annotations.get("schema.rule").and_then(|a| match &a.value {
-            crate::ir::core_ir::AnnotationValue::String(s) => Some(s.clone()),
+            crate::frontend::schema_ast::AnnotationValue::String(s) => Some(s.clone()),
             _ => None,
         })
     }
@@ -398,7 +398,7 @@ impl Inspector {
         annotations
             .get("schema.field")
             .and_then(|a| match &a.value {
-                crate::ir::core_ir::AnnotationValue::String(s) => Some(s.clone()),
+                crate::frontend::schema_ast::AnnotationValue::String(s) => Some(s.clone()),
                 _ => None,
             })
     }
@@ -410,7 +410,7 @@ impl Inspector {
         annotations
             .get("lowering.rule")
             .and_then(|a| match &a.value {
-                crate::ir::core_ir::AnnotationValue::String(s) => Some(s.clone()),
+                crate::frontend::schema_ast::AnnotationValue::String(s) => Some(s.clone()),
                 _ => None,
             })
     }

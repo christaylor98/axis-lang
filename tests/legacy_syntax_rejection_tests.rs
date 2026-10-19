@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod legacy_syntax_rejection_tests {
-    use axis_lang_lab::frontend::production_parser::parse_production_string;
+    use axis_lang::frontend::production_parser::parse_production_string;
 
     #[test]
     fn test_reject_quoted_keyword_string() {

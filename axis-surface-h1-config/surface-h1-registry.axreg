@@ -1,5 +1,39 @@
 registry surface-h1 0.1
 
-# Surface-H1 Registry
-# Empty registry for pure expression evaluation
-# No external operators required
+// Surface-H1 Registry
+// H1 surface type declarations and primitive constructors.
+// Identities for value_construct / value_list_construct: §5b SHA-256("name").
+
+// ─────────── types ───────────
+type Unit    = prim unit
+type Bool    = prim bool
+type Int     = prim int
+type Text    = prim text
+type Float   = prim float
+type Decimal = prim dec
+
+// ─────────── value construction ───────────
+// value_construct: construct a compound Value from N positional slots.
+// variadic true: arity enforced at surface; verifier skips arity check.
+fn value_construct
+  identity 0xf99957951a17948c8f56a460948e18bf018770554c596f6ba3904f70f13923d7
+  kind leaf
+  in ()
+  out Unit
+  effect pure
+  deterministic true
+  idempotent false
+  variadic true
+end
+
+// value_list_construct: construct a List from N Value elements.
+fn value_list_construct
+  identity 0xb567a973a8c605c2ddab24e37155d096b12419e6c1f4fce235932d5d5283e63e
+  kind leaf
+  in ()
+  out Unit
+  effect pure
+  deterministic true
+  idempotent false
+  variadic true
+end

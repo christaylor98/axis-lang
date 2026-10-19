@@ -2,9 +2,9 @@
 //
 // Tests for NF validation in the pipeline
 
-use axis_lang_lab::frontend::schema_ast::{SchemaAstNode, SchemaValue};
-use axis_lang_lab::frontend::token::Span;
-use axis_lang_lab::normalisation::validate_nf;
+use axis_lang::frontend::schema_ast::{SchemaAstNode, SchemaValue};
+use axis_lang::frontend::token::Span;
+use axis_lang::normalize::nf_validation::validate_nf;
 use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════

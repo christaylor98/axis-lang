@@ -5,9 +5,9 @@
 // - Test NF boundary enforcement
 // - Test error handling
 
-use axis_lang_lab::frontend::schema_ast::{SchemaAstNode, SchemaValue};
-use axis_lang_lab::frontend::token::{Span, Token, TokenKind};
-use axis_lang_lab::normalize::{NormalizationContext, NormalizationError};
+use axis_lang::frontend::schema_ast::{SchemaAstNode, SchemaValue};
+use axis_lang::frontend::token::{Span, Token, TokenKind};
+use axis_lang::normalize::{NormalizationContext, NormalizationError};
 use std::collections::HashMap;
 use std::path::Path;
 

@@ -1,0 +1,5 @@
+// Matrix fixture: LamExpr
+// Lambda expression as the function body.
+fn f(x: Bool) -> Bool {
+  fn(a) { a }
+}

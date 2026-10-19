@@ -1,0 +1,244 @@
+# AI3 AST Schema
+# Surface: surface-ai3
+# Version: 0.1
+#
+# AI3 = M1 + mandatory tail `return` + `;` statement separators.
+# Derived from axis-surface-m1-config/m1-ast.yaml. M1 is NOT modified.
+#
+# Deltas from M1 (two nodes added, zero projections changed):
+#   1. ReturnStmt: NEW — expr: child(1)
+#   2. BranchBody: NEW — M1's Body projection verbatim (AI3_UNSHARE_BODY_V1)
+# Body's projection is UNCHANGED. `last_child` resolves whatever occupies the
+# tail slot, and in AI3 that is a ReturnStmt node instead of a bare Expr node.
+# The optional trailing `;` in LetBinding / LetDecl / ReturnStmt sits AFTER every
+# indexed child, so no index shifts either.
+#
+# Child indices count ALL children including tokens, 0-based.
+# A trailing optional element that did not match contributes no child
+# (parser_runtime.rs:387-397 restores the checkpoint and appends nothing).
+
+nodes:
+
+  Program:
+    fields:
+      items:
+        from: children(0..)
+
+  Item:
+    fields:
+      variant:
+        from: child(0)
+
+  # fn name(params) -> return_type { body }
+  FnDecl:
+    fields:
+      name:
+        from: token(IDENT)
+      params:
+        from: child(3)        # TypedParamList
+      return_type:
+        from: child(6)        # TypeExpr (after PUNCT_->)
+      body:
+        from: child(8)        # Body (after PUNCT_{)
+
+  # AI3: children are <KW_LET> <IDENT> <PUNCT_=> Expr [<PUNCT_;>]
+  # child(3) is the Expr whether or not the optional `;` is present.
+  LetDecl:
+    fields:
+      name:
+        from: token(IDENT)
+      value:
+        from: child(3)   # Expr (after KW_LET IDENT PUNCT_=)
+
+  # ── TYPED PARAMS ─────────────────────────────────────────────
+
+  TypedParamList:
+    fields:
+      params:
+        from: children(0..)
+
+  TypedParamRest:
+    fields:
+      param:
+        from: child(1)
+
+  TypedParam:
+    fields:
+      name:
+        from: token(IDENT)
+      type_expr:
+        from: child(2)
+
+  # ── TYPE EXPRESSIONS ─────────────────────────────────────────
+
+  TypeExpr:
+    fields:
+      variant:
+        from: child(0)
+
+  # Value(T1, T2, T3) — compound constructor tag (max arity 3)
+  ValueTypeExpr:
+    fields:
+      type_args:
+        from: children_excluding_last(2)  # TypeExpr + TypeExprRest*, excludes trailing PUNCT_)
+
+  TypeExprRest:
+    fields:
+      type_expr:
+        from: child(1)
+
+  # ValueList(T) — list constructor tag
+  ValueListTypeExpr:
+    fields:
+      element_type:
+        from: child(2)        # inner TypeExpr
+
+  # Int | Text | Bool | Unit | user-defined
+  PrimTypeExpr:
+    fields:
+      name:
+        from: first_token
+
+  # ── BODY ─────────────────────────────────────────────────────
+
+  # AI3: children are [LetBinding..., ReturnStmt] — every child is a node, so
+  # children_excluding_last(0) and last_child both stay legal (both HARD ERROR
+  # on a terminal in range: schema_ast.rs:423 and :456). The optional `;` is
+  # inside LetBinding / ReturnStmt, never a direct child of Body, which is
+  # exactly why those two resolvers keep working.
+  Body:
+    fields:
+      bindings:
+        from: children_excluding_last(0)  # all LetBindings except the tail
+      result:
+        from: last_child                  # ReturnStmt (was: bare Expr in M1)
+
+  # AI3 DELTA — NEW NODE (AI3_UNSHARE_BODY_V1).
+  # The if-branch body. Field names and resolvers are IDENTICAL to Body's, and
+  # identical to M1's Body (m1-ast.yaml:90-96); only the node kind differs.
+  # That matters downstream: fold_body_to_let_chain (normalize_engine.rs:286-350)
+  # reads the `bindings` and `result` fields by name and never looks at the node
+  # kind, so BranchBody folds to the same LetExpr chain Body does. Here the tail
+  # child is a bare Expr node, exactly as in M1.
+  BranchBody:
+    fields:
+      bindings:
+        from: children_excluding_last(0)  # all LetBindings except the tail
+      result:
+        from: last_child                  # bare Expr, as in M1
+
+  # AI3 DELTA — NEW NODE.
+  # <KW_RETURN> Expr [<PUNCT_;>]  →  child(1) is the Expr.
+  #
+  # The field is named `expr` DELIBERATELY. unwrap_transparent_node
+  # (normalize_engine.rs:216-235) hunts a FIXED field-name list —
+  # variant, content, expr, value, inner, body, left, target — and returns the
+  # first one holding a Node. `expr` is on that list, so `nf_node: transparent`
+  # in ai3-normalize.yaml erases this node with no Rust change. Renaming this
+  # field to anything off that list would break the elimination.
+  ReturnStmt:
+    fields:
+      expr:
+        from: child(1)
+
+  # AI3: children are <KW_LET> <IDENT> <PUNCT_=> Expr [<PUNCT_;>]
+  LetBinding:
+    fields:
+      name:
+        from: token(IDENT)
+      value:
+        from: child(3)   # Expr (after KW_LET IDENT PUNCT_=)
+
+  # ── EXPRESSIONS ──────────────────────────────────────────────
+
+  Expr:
+    fields:
+      variant:
+        from: child(0)
+
+  # if cond { then } else { else }
+  IfExpr:
+    fields:
+      condition:
+        from: child(1)
+      then_branch:
+        from: child(3)
+      else_branch:
+        from: child(6)        # ElseTail (AI3_ELSE_IF_V1)
+  ElseTail:
+    fields:
+      variant:
+        from: child(0)        # ElseBlock | IfExpr
+  ElseBlock:
+    fields:
+      body:
+        from: child(1)        # BranchBody inside the braces
+
+  # ValueTypeArgs wraps TypeExpr TypeExprRest* for fixed indexing
+  ValueTypeArgs:
+    fields:
+      types:
+        from: children(0..)   # TypeExpr + TypeExprRest*
+
+  # Value(T1, T2)(e1, e2) — type tag + args
+  # Grammar: <KW_VALUE> <PUNCT_(> ValueTypeArgs <PUNCT_)> <PUNCT_(> ArgList <PUNCT_)>
+  # child(2)=ValueTypeArgs  child(5)=ArgList
+  ValueConstructExpr:
+    fields:
+      type_args:
+        from: child(2)   # ValueTypeArgs node
+      args:
+        from: child(5)   # ArgList inside second parens
+
+  # ValueList(T)(e1, e2, ...) or ValueList(T)[e1, e2, ...]
+  ValueListConstructExpr:
+    fields:
+      element_type:
+        from: child(2)          # inner TypeExpr
+      args:
+        from: child(5)          # ArgList
+
+  # name(args)
+  CallExpr:
+    fields:
+      name:
+        from: token(IDENT)
+      args:
+        from: child(2)
+
+  ArgList:
+    fields:
+      args:
+        from: children(0..)
+
+  ArgListRest:
+    fields:
+      arg:
+        from: child(1)
+
+  # ── LITERALS ─────────────────────────────────────────────────
+
+  # determine — zero-operand discharge gate; lowers to CDeterminate.
+  DetermineExpr:
+    fields: {}
+
+  IntLit:
+    fields:
+      value:
+        from: token(INT_LIT)
+
+  TextLit:
+    fields:
+      value:
+        from: token(STRING_LIT)
+
+  BoolLit:
+    fields:
+      value:
+        from: child_token(2)
+
+  UnitLit:
+    fields: {}
+
+  Empty:
+    fields: {}

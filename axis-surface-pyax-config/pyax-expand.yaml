@@ -1,0 +1,593 @@
+# PyAx Expand Rules
+# Surface: surface-pyax (PYAX_SURFACE_EXPAND_V1, phase 1)
+# Version: 0.1
+#
+# Read by src/normalize/expand_engine.rs, which is surface-agnostic: it knows
+# roles (`kinds:`), not PyAx. Everything PyAx-specific is here.
+#
+# LISTS. `list[T]` is a ValueList at the Axis level; expand tracks T and
+# unpacks each element read with the typed accessor (`loops.unpack`), which
+# faults loudly on a wrong type. Loop state travels the same way, packed with
+# value_make. pyax_list_get comes from pyax.axreg + pyax-dispatch.toml.
+#
+# DISPATCH. Each operator, builtin and method lists its overloads by argument
+# type; expand picks the one matching the operand types the author wrote (or
+# that follow from what they wrote) and emits its call template. `$n` is the
+# n-th argument, `@unit` the unit literal. Nothing is chosen from the registry,
+# and every emitted call is checked again by the verifier.
+#
+# PRELUDE. Operators whose Python meaning no single registry callable has are
+# written in PyAx in pyax-prelude.pyax and compiled into every program:
+#   `//` and `%`: the bridge's int_div / int_mod are Euclidean, which differs
+#   from Python's floor for a negative divisor (Python -7 // -2 == 3; Euclidean
+#   gives 4). py_floordiv / py_mod correct for the sign.
+
+version: "0.1"
+prelude: pyax-prelude.pyax
+reserved_prefix: "__"
+escape_namespace: axis
+
+kinds:
+  program: Program
+  fn: FnDecl
+  param_list: TypedParamList
+  param: TypedParam
+  param_rest: TypedParamRest
+  ret_ann: RetAnn
+  named_type: NamedType
+  generic_type: GenericType
+  type_rest: TypeRest
+  block: Block
+  assign: AssignStmt
+  ann_assign: AnnAssignStmt
+  return: ReturnStmt
+  pass: PassStmt
+  expr_stmt: ExprStmt
+  aug_assign: AugAssignStmt
+  sub_assign: SubAssignStmt
+  break: BreakStmt
+  continue: ContinueStmt
+  if_stmt: IfStmt
+  elif: ElifClause
+  else: ElseClause
+  for_stmt: ForStmt
+  for_target: ForTarget
+  while_stmt: WhileStmt
+  list_comp: ListComp
+  gen_expr: GenExpr
+  comp_if: CompIf
+  expr_list: ExprList
+  tuple_rest: TupleRest
+  tuple_assign: TupleAssignStmt
+  target_list: TargetList
+  dict_lit: DictLit
+  dict_item: DictItem
+  dict_rest: DictRest
+  slice_trailer: SliceTrailer
+  slice_step: SliceStep
+  aug_sub_assign: AugSubAssignStmt
+  del_stmt: DelStmt
+  fstring: FString
+  fexpr: FExpr
+  float_lit: FloatLit
+  attr_trailer: AttrTrailer
+  kw_arg: KwArg
+  module_doc: ModuleDoc
+  dict_comp: DictComp
+  dict_spread: DictSpread
+  import_stmt: ImportStmt
+  raise_stmt: RaiseStmt
+  assert_stmt: AssertStmt
+  cond_expr: Expr
+  cond_tail: CondTail
+  compare: Comparison
+  not: NotOp
+  neg: NegOp
+  inv: InvOp
+  postfix: Postfix
+  call_trailer: CallTrailer
+  method_trailer: MethodTrailer
+  index_trailer: IndexTrailer
+  arg_list: ArgList
+  arg_rest: ArgRest
+  empty: Empty
+  name: Name
+  int_lit: IntLit
+  text_lit: TextLit
+  bool_lit: BoolLit
+  none_lit: NoneLit
+  paren: ParenExpr
+  list_lit: ListLit
+  call_out: CallExpr
+
+transparent: [Item, Stmt, TypeExpr, NotExpr, Factor, Trailer, Atom, ElseTail, SliceBound, FPart, Arg, ConstDecl]
+chains: [OrExpr, AndExpr, BitOr, BitXor, BitAnd, Shift, Sum, Term, Power]
+
+types:
+  names:
+    int: Int
+    str: Text
+    bool: Bool
+    float: Float
+    Decimal: Dec
+    None: Unit
+  list: list
+  list_axis: ValueList
+  tuple: tuple
+  dict: dict
+  generic_aliases:
+    List: list
+    Dict: dict
+    Tuple: tuple
+  no_return: Unit
+  value: Value
+  int: Int
+  text: Text
+  bool: Bool
+  none: Unit
+
+canonical_lexemes:
+  "True": "true"
+  "False": "false"
+
+operators:
+  "+":
+    - { args: [Int, Int], ret: Int, emit: "int_add($0, $1)" }
+    - { args: [Text, Text], ret: Text, emit: "str_concat($0, $1)" }
+    - { args: ["list[*]", "list[*]"], ret: "$0", emit: "flatten(list_make($0, $1))" }
+    - { args: [Float, Float], ret: Float, emit: "float_add($0, $1)" }
+    - { args: [Int, Float], ret: Float, emit: "float_add(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Float, emit: "float_add($0, int_to_float($1))" }
+    - { args: [Dec, Dec], ret: Dec, emit: "dec_add($0, $1)" }
+    - { args: [Int, Dec], ret: Dec, emit: "dec_add(int_to_dec($0), $1)" }
+    - { args: [Dec, Int], ret: Dec, emit: "dec_add($0, int_to_dec($1))" }
+  "-":
+    - { args: [Int, Int], ret: Int, emit: "int_sub($0, $1)" }
+    - { args: [Float, Float], ret: Float, emit: "float_sub($0, $1)" }
+    - { args: [Int, Float], ret: Float, emit: "float_sub(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Float, emit: "float_sub($0, int_to_float($1))" }
+    - { args: [Dec, Dec], ret: Dec, emit: "dec_sub($0, $1)" }
+    - { args: [Int, Dec], ret: Dec, emit: "dec_sub(int_to_dec($0), $1)" }
+    - { args: [Dec, Int], ret: Dec, emit: "dec_sub($0, int_to_dec($1))" }
+  "*":
+    - { args: [Int, Int], ret: Int, emit: "int_mul($0, $1)" }
+    - { args: ["list[*]", Int], ret: "$0", emit: "py_list_repeat($0, $1)" }
+    - { args: [Text, Int], ret: Text, emit: "str_repeat($0, $1)" }
+    - { args: [Int, Text], ret: Text, emit: "str_repeat($1, $0)" }
+    - { args: [Float, Float], ret: Float, emit: "float_mul($0, $1)" }
+    - { args: [Int, Float], ret: Float, emit: "float_mul(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Float, emit: "float_mul($0, int_to_float($1))" }
+    - { args: [Dec, Dec], ret: Dec, emit: "dec_mul($0, $1)" }
+    - { args: [Int, Dec], ret: Dec, emit: "dec_mul(int_to_dec($0), $1)" }
+    - { args: [Dec, Int], ret: Dec, emit: "dec_mul($0, int_to_dec($1))" }
+  "/":
+    - { args: [Int, Int], ret: Float, emit: "py_truediv(int_to_float($0), int_to_float($1))" }
+    - { args: [Float, Float], ret: Float, emit: "py_truediv($0, $1)" }
+    - { args: [Int, Float], ret: Float, emit: "py_truediv(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Float, emit: "py_truediv($0, int_to_float($1))" }
+    - { args: [Dec, Dec], ret: Dec, emit: "py_dec_div($0, $1)" }
+    - { args: [Dec, Int], ret: Dec, emit: "py_dec_div($0, int_to_dec($1))" }
+    - { args: [Int, Dec], ret: Dec, emit: "py_dec_div(int_to_dec($0), $1)" }
+  "//":
+    - { args: [Int, Int], ret: Int, emit: "py_floordiv($0, $1)" }
+    - { args: [Float, Float], ret: Float, emit: "py_float_floordiv($0, $1)" }
+    - { args: [Int, Float], ret: Float, emit: "py_float_floordiv(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Float, emit: "py_float_floordiv($0, int_to_float($1))" }
+  "%":
+    - { args: [Int, Int], ret: Int, emit: "py_mod($0, $1)" }
+    - { args: [Float, Float], ret: Float, emit: "py_float_mod($0, $1)" }
+    - { args: [Int, Float], ret: Float, emit: "py_float_mod(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Float, emit: "py_float_mod($0, int_to_float($1))" }
+  "neg":
+    - { args: [Int], ret: Int, emit: "py_neg($0)" }
+    - { args: [Float], ret: Float, emit: "float_neg($0)" }
+    - { args: [Dec], ret: Dec, emit: "dec_neg($0)" }
+  "|":
+    - { args: ["dict[*]", "dict[*]"], ret: "$0", emit: "py_dict_merge($0, $1)" }
+    - { args: [Int, Int], ret: Int, emit: "int_bit_or($0, $1)" }
+  "&":
+    - { args: [Int, Int], ret: Int, emit: "int_bit_and($0, $1)" }
+  "^":
+    - { args: [Int, Int], ret: Int, emit: "int_bit_xor($0, $1)" }
+  "<<":
+    - { args: [Int, Int], ret: Int, emit: "int_shl($0, $1)" }
+  ">>":
+    - { args: [Int, Int], ret: Int, emit: "int_shr($0, $1)" }
+  "~":
+    - { args: [Int], ret: Int, emit: "int_bit_not($0)" }
+  "**":
+    - { args: [Int, Int], ret: Int, emit: "py_pow($0, $1)" }
+    - { args: [Float, Float], ret: Float, emit: "float_pow($0, $1)" }
+    - { args: [Float, Int], ret: Float, emit: "float_pow($0, int_to_float($1))" }
+    - { args: [Int, Float], ret: Float, emit: "float_pow(int_to_float($0), $1)" }
+  "==":
+    - { args: [Int, Int], ret: Bool, emit: "int_eq($0, $1)" }
+    - { args: [Text, Text], ret: Bool, emit: "text_eq($0, $1)" }
+    - { args: [Bool, Bool], ret: Bool, emit: "py_bool_eq($0, $1)" }
+    - { args: ["tuple[*]", "tuple[*]"], ret: Bool, emit: "value_eq($0, $1)" }
+    - { args: ["list[*]", "list[*]"], ret: Bool, emit: "pyax_list_eq($0, $1)" }
+    - { args: [Float, Float], ret: Bool, emit: "float_eq($0, $1)" }
+    - { args: [Int, Float], ret: Bool, emit: "float_eq(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Bool, emit: "float_eq($0, int_to_float($1))" }
+    - { args: [Dec, Dec], ret: Bool, emit: "dec_eq($0, $1)" }
+    - { args: [Int, Dec], ret: Bool, emit: "dec_eq(int_to_dec($0), $1)" }
+    - { args: [Dec, Int], ret: Bool, emit: "dec_eq($0, int_to_dec($1))" }
+  "!=":
+    - { args: [Int, Int], ret: Bool, emit: "bool_not(int_eq($0, $1))" }
+    - { args: [Text, Text], ret: Bool, emit: "bool_not(text_eq($0, $1))" }
+    - { args: [Bool, Bool], ret: Bool, emit: "bool_not(py_bool_eq($0, $1))" }
+    - { args: ["tuple[*]", "tuple[*]"], ret: Bool, emit: "bool_not(value_eq($0, $1))" }
+    - { args: ["list[*]", "list[*]"], ret: Bool, emit: "bool_not(pyax_list_eq($0, $1))" }
+    - { args: [Float, Float], ret: Bool, emit: "bool_not(float_eq($0, $1))" }
+    - { args: [Int, Float], ret: Bool, emit: "bool_not(float_eq(int_to_float($0), $1))" }
+    - { args: [Float, Int], ret: Bool, emit: "bool_not(float_eq($0, int_to_float($1)))" }
+    - { args: [Dec, Dec], ret: Bool, emit: "bool_not(dec_eq($0, $1))" }
+  "<":
+    - { args: [Int, Int], ret: Bool, emit: "int_lt($0, $1)" }
+    - { args: [Text, Text], ret: Bool, emit: "text_lt($0, $1)" }
+    - { args: [Float, Float], ret: Bool, emit: "float_lt($0, $1)" }
+    - { args: [Int, Float], ret: Bool, emit: "float_lt(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Bool, emit: "float_lt($0, int_to_float($1))" }
+    - { args: [Dec, Dec], ret: Bool, emit: "dec_lt($0, $1)" }
+    - { args: [Int, Dec], ret: Bool, emit: "dec_lt(int_to_dec($0), $1)" }
+    - { args: [Dec, Int], ret: Bool, emit: "dec_lt($0, int_to_dec($1))" }
+  "<=":
+    - { args: [Int, Int], ret: Bool, emit: "int_lte($0, $1)" }
+    - { args: [Text, Text], ret: Bool, emit: "text_lte($0, $1)" }
+    - { args: [Float, Float], ret: Bool, emit: "float_lte($0, $1)" }
+    - { args: [Int, Float], ret: Bool, emit: "float_lte(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Bool, emit: "float_lte($0, int_to_float($1))" }
+    - { args: [Dec, Dec], ret: Bool, emit: "dec_lte($0, $1)" }
+    - { args: [Int, Dec], ret: Bool, emit: "dec_lte(int_to_dec($0), $1)" }
+    - { args: [Dec, Int], ret: Bool, emit: "dec_lte($0, int_to_dec($1))" }
+  ">":
+    - { args: [Int, Int], ret: Bool, emit: "int_gt($0, $1)" }
+    - { args: [Text, Text], ret: Bool, emit: "text_gt($0, $1)" }
+    - { args: [Float, Float], ret: Bool, emit: "float_gt($0, $1)" }
+    - { args: [Int, Float], ret: Bool, emit: "float_gt(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Bool, emit: "float_gt($0, int_to_float($1))" }
+    - { args: [Dec, Dec], ret: Bool, emit: "dec_gt($0, $1)" }
+    - { args: [Int, Dec], ret: Bool, emit: "dec_gt(int_to_dec($0), $1)" }
+    - { args: [Dec, Int], ret: Bool, emit: "dec_gt($0, int_to_dec($1))" }
+  ">=":
+    - { args: [Int, Int], ret: Bool, emit: "int_gte($0, $1)" }
+    - { args: [Text, Text], ret: Bool, emit: "text_gte($0, $1)" }
+    - { args: [Float, Float], ret: Bool, emit: "float_gte($0, $1)" }
+    - { args: [Int, Float], ret: Bool, emit: "float_gte(int_to_float($0), $1)" }
+    - { args: [Float, Int], ret: Bool, emit: "float_gte($0, int_to_float($1))" }
+    - { args: [Dec, Dec], ret: Bool, emit: "dec_gte($0, $1)" }
+    - { args: [Int, Dec], ret: Bool, emit: "dec_gte(int_to_dec($0), $1)" }
+    - { args: [Dec, Int], ret: Bool, emit: "dec_gte($0, int_to_dec($1))" }
+  "in":
+    - { args: [Text, Text], ret: Bool, emit: "str_contains($1, $0)" }
+    - { args: [Int, "list[Int]"], ret: Bool, emit: "py_contains_int($1, $0)" }
+    - { args: [Text, "list[Text]"], ret: Bool, emit: "py_contains_text($1, $0)" }
+    - { args: ["*", "dict[*]"], ret: Bool, emit: "py_dict_has($1, $0)" }
+  "not in":
+    - { args: [Text, Text], ret: Bool, emit: "bool_not(str_contains($1, $0))" }
+    - { args: [Int, "list[Int]"], ret: Bool, emit: "bool_not(py_contains_int($1, $0))" }
+    - { args: [Text, "list[Text]"], ret: Bool, emit: "bool_not(py_contains_text($1, $0))" }
+    - { args: ["*", "dict[*]"], ret: Bool, emit: "bool_not(py_dict_has($1, $0))" }
+  # bool_and / bool_or short-circuit (BOOL_SHORT_CIRCUIT_V1), as `and` / `or` do.
+  # In conditions, operands are converted by `truthy` first.
+  "and":
+    - { args: [Bool, Bool], ret: Bool, emit: "bool_and($0, $1)" }
+  "or":
+    - { args: [Bool, Bool], ret: Bool, emit: "bool_or($0, $1)" }
+  "not":
+    - { args: [Bool], ret: Bool, emit: "bool_not($0)" }
+
+builtins:
+  len:
+    - { args: [Text], ret: Int, emit: "str_len($0)" }
+    - { args: ["list[*]"], ret: Int, emit: "list_len($0)" }
+    - { args: ["dict[*]"], ret: Int, emit: "py_dict_len($0)" }
+  range:
+    - { args: [Int], ret: "list[Int]", emit: "range(0, $0)" }
+    - { args: [Int, Int], ret: "list[Int]", emit: "range($0, $1)" }
+    - { args: [Int, Int, Int], ret: "list[Int]", emit: "range_step($0, $1, $2)" }
+  list:
+    - { args: ["list[*]"], ret: "$0", emit: "$0" }
+  sum:
+    - { args: ["list[Int]"], ret: Int, emit: "py_sum_int($0)" }
+    - { args: ["list[Float]"], ret: Float, emit: "py_sum_float($0)" }
+  sorted:
+    - { args: ["list[Int]"], ret: "list[Int]", emit: "py_sorted_int($0)" }
+    - { args: ["list[Text]"], ret: "list[Text]", emit: "py_sorted_text($0)" }
+  "sorted(reverse)":
+    - { args: ["list[Int]", Bool], ret: "list[Int]", emit: "py_maybe_reverse(py_sorted_int($0), $1)" }
+    - { args: ["list[Text]", Bool], ret: "list[Text]", emit: "py_maybe_reverse(py_sorted_text($0), $1)" }
+  # print(..., end="") — the parts are joined first (sep= is the separator)
+  "print(end)":
+    - { args: [Text], ret: Unit, emit: "io_print($0)" }
+    - { args: [Text, Text], ret: Unit, emit: "io_print(str_concat($0, $1))" }
+  str:
+    - { args: [Int], ret: Text, emit: "int_to_str($0)" }
+    - { args: [Float], ret: Text, emit: "py_float_str($0)" }
+    - { args: [Dec], ret: Text, emit: "dec_to_text($0)" }
+    - { args: [Text], ret: Text, emit: "$0" }
+    - { args: [Bool], ret: Text, emit: "py_bool_str($0)" }
+  int:
+    - { args: [Text], ret: Int, emit: "str_to_int(str_trim($0))" }
+    - { args: [Int], ret: Int, emit: "$0" }
+    - { args: [Float], ret: Int, emit: "float_to_int($0)" }
+    - { args: [Dec], ret: Int, emit: "dec_to_int($0)" }
+  float:
+    - { args: [Int], ret: Float, emit: "int_to_float($0)" }
+    - { args: [Float], ret: Float, emit: "$0" }
+    - { args: [Text], ret: Float, emit: "str_to_float(str_trim($0))" }
+    - { args: [Dec], ret: Float, emit: "dec_to_float($0)" }
+  Decimal:
+    - { args: [Text], ret: Dec, emit: "str_to_dec(str_trim($0))" }
+    - { args: [Int], ret: Dec, emit: "int_to_dec($0)" }
+    - { args: [Dec], ret: Dec, emit: "$0" }
+  round:
+    - { args: [Float], ret: Int, emit: "py_round($0)" }
+    - { args: [Float, Int], ret: Float, emit: "py_round_to($0, $1)" }
+    - { args: [Dec, Int], ret: Dec, emit: "dec_round($0, $1)" }
+  "math.sqrt":
+    - { args: [Float], ret: Float, emit: "float_sqrt($0)" }
+    - { args: [Int], ret: Float, emit: "float_sqrt(int_to_float($0))" }
+  "math.floor":
+    - { args: [Float], ret: Int, emit: "float_to_int(float_floor($0))" }
+    - { args: [Int], ret: Int, emit: "$0" }
+  "math.ceil":
+    - { args: [Float], ret: Int, emit: "float_to_int(float_ceil($0))" }
+    - { args: [Int], ret: Int, emit: "$0" }
+  "math.isclose":
+    - { args: [Float, Float], ret: Bool, emit: "py_isclose($0, $1)" }
+  print:
+    - { args: [], ret: Unit, emit: "io_println(\"\")" }
+    - { args: [Text], ret: Unit, emit: "io_println($0)" }
+    - { args: [Int], ret: Unit, emit: "io_println(int_to_str($0))" }
+    - { args: [Float], ret: Unit, emit: "io_println(py_float_str($0))" }
+    - { args: [Dec], ret: Unit, emit: "io_println(dec_to_text($0))" }
+    - { args: [Bool], ret: Unit, emit: "io_println(py_bool_str($0))" }
+  any:
+    - { args: ["list[Bool]"], ret: Bool, emit: "py_any($0)" }
+  all:
+    - { args: ["list[Bool]"], ret: Bool, emit: "py_all($0)" }
+  reversed:
+    - { args: ["list[*]"], ret: "$0", emit: "pyax_list_reverse($0)" }
+    - { args: [Text], ret: "list[Text]", emit: "pyax_list_reverse(py_chars($0))" }
+  divmod:
+    - { args: [Int, Int], ret: "tuple[Int,Int]", emit: "value_make(py_floordiv($0, $1), py_mod($0, $1))" }
+  bool:
+    - { args: [Bool], ret: Bool, emit: "$0" }
+    - { args: [Int], ret: Bool, emit: "bool_not(int_eq($0, 0))" }
+    - { args: [Text], ret: Bool, emit: "bool_not(text_eq($0, \"\"))" }
+    - { args: ["list[*]"], ret: Bool, emit: "int_gt(list_len($0), 0)" }
+  abs:
+    - { args: [Int], ret: Int, emit: "int_abs($0)" }
+    - { args: [Float], ret: Float, emit: "float_abs($0)" }
+    - { args: [Dec], ret: Dec, emit: "dec_abs($0)" }
+  ord:
+    - { args: [Text], ret: Int, emit: "ord($0)" }
+  chr:
+    - { args: [Int], ret: Text, emit: "chr($0)" }
+  min:
+    - { args: [Int, Int], ret: Int, emit: "int_min($0, $1)" }
+    - { args: [Float, Float], ret: Float, emit: "float_min($0, $1)" }
+    - { args: ["list[Float]"], ret: Float, emit: "py_min_float($0)" }
+    - { args: ["list[Int]"], ret: Int, emit: "py_min_int($0)" }
+    - { args: ["list[Text]"], ret: Text, emit: "py_min_text($0)" }
+  max:
+    - { args: [Int, Int], ret: Int, emit: "int_max($0, $1)" }
+    - { args: [Float, Float], ret: Float, emit: "float_max($0, $1)" }
+    - { args: ["list[Float]"], ret: Float, emit: "py_max_float($0)" }
+    - { args: ["list[Int]"], ret: Int, emit: "py_max_int($0)" }
+    - { args: ["list[Text]"], ret: Text, emit: "py_max_text($0)" }
+
+methods:
+  "Text.upper":
+    - { args: [Text], ret: Text, emit: "str_to_upper($0)" }
+  "Text.lower":
+    - { args: [Text], ret: Text, emit: "str_to_lower($0)" }
+  "Text.strip":
+    - { args: [Text], ret: Text, emit: "str_trim($0)" }
+  "Text.startswith":
+    - { args: [Text, Text], ret: Bool, emit: "str_starts_with($0, $1)" }
+  "Text.endswith":
+    - { args: [Text, Text], ret: Bool, emit: "str_ends_with($0, $1)" }
+  "Text.lstrip":
+    - { args: [Text], ret: Text, emit: "py_lstrip($0)" }
+  "Text.rstrip":
+    - { args: [Text], ret: Text, emit: "py_rstrip($0)" }
+  "Text.splitlines":
+    - { args: [Text], ret: "list[Text]", emit: "py_splitlines($0)" }
+  "Text.rfind":
+    - { args: [Text, Text], ret: Int, emit: "py_rfind($0, $1)" }
+  "Text.index":
+    - { args: [Text, Text], ret: Int, emit: "py_str_index($0, $1)" }
+  "Text.count":
+    - { args: [Text, Text], ret: Int, emit: "py_count($0, $1)" }
+  "Text.isalnum":
+    - { args: [Text], ret: Bool, emit: "py_isalnum($0)" }
+  "Text.zfill":
+    - { args: [Text, Int], ret: Text, emit: "py_zfill($0, $1)" }
+  "Text.rjust":
+    - { args: [Text, Int], ret: Text, emit: "py_rjust($0, $1, \" \")" }
+    - { args: [Text, Int, Text], ret: Text, emit: "py_rjust($0, $1, $2)" }
+  "Text.ljust":
+    - { args: [Text, Int], ret: Text, emit: "py_ljust($0, $1, \" \")" }
+    - { args: [Text, Int, Text], ret: Text, emit: "py_ljust($0, $1, $2)" }
+  "Text.capitalize":
+    - { args: [Text], ret: Text, emit: "py_capitalize($0)" }
+  "list[*].count":
+    - { args: ["list[Int]", Int], ret: Int, emit: "py_list_count_int($0, $1)" }
+    - { args: ["list[Text]", Text], ret: Int, emit: "py_list_count_text($0, $1)" }
+  "list[*].index":
+    - { args: ["list[Int]", Int], ret: Int, emit: "py_list_index_int($0, $1)" }
+    - { args: ["list[Text]", Text], ret: Int, emit: "py_list_index_text($0, $1)" }
+  "Text.islower":
+    - { args: [Text], ret: Bool, emit: "py_islower($0)" }
+  "Text.isupper":
+    - { args: [Text], ret: Bool, emit: "py_isupper($0)" }
+  "Text.isdigit":
+    - { args: [Text], ret: Bool, emit: "py_isdigit($0)" }
+  "Text.isalpha":
+    - { args: [Text], ret: Bool, emit: "py_isalpha($0)" }
+  "Text.isspace":
+    - { args: [Text], ret: Bool, emit: "py_isspace($0)" }
+  "Text.split":
+    - { args: [Text], ret: "list[Text]", emit: "py_split_ws($0)" }
+    - { args: [Text, Text], ret: "list[Text]", emit: "pyax_text_list_widen(str_split($0, $1))" }
+  "Text.replace":
+    - { args: [Text, Text, Text], ret: Text, emit: "str_replace($0, $1, $2)" }
+  "Text.find":
+    - { args: [Text, Text], ret: Int, emit: "str_index_of($0, $1)" }
+  "Text.join":
+    - { args: [Text, "list[Text]"], ret: Text, emit: "str_join($1, $0)" }
+  "list[*].copy":
+    - { args: ["list[*]"], ret: "$0", emit: "$0" }
+
+lists:
+  new: "list_make($*)"
+  get: "pyax_list_get($0, $1)"
+  index: "py_index($0, $1)"
+  len: "list_len($0)"
+  append: "value_list_push($0, $1)"        # PYAX_LIST_IN_PLACE_V1: pushes in place when the list is unshared
+  extend: "flatten(list_make($0, $1))"
+  set: "py_list_set($0, $1, $2)"
+  pop_value: "py_list_last($0)"
+  pop_rest: "py_list_drop_last($0)"
+  del: "py_list_del($0, $1)"
+  insert: "py_list_insert($0, $1, $2)"
+
+# A dict is its keys and its values, two parallel lists, packed in one value;
+# insertion order is kept, as Python's is. Lookup is a linear scan (prelude).
+dicts:
+  new: "value_make($0, $1)"
+  get: "py_dict_get($0, $1)"
+  get_or: "py_dict_get_or($0, $1, $2)"
+  set: "py_dict_set($0, $1, $2)"
+  has: "py_dict_has($0, $1)"
+  del: "py_dict_del($0, $1)"
+  len: "py_dict_len($0)"
+  keys: "py_dict_keys($0)"
+  values: "py_dict_values($0)"
+  items: "py_dict_items($0)"
+  merge: "py_dict_merge($0, $1)"
+
+slices:
+  list: "py_list_slice($0, $1, $2)"
+  text: "py_text_slice($0, $1, $2)"
+  open_end: 4611686018427387904
+  reverse_list: "pyax_list_reverse($0)"
+  reverse_text: "py_text_reverse($0)"
+  # Any other step: $0 seq, $1 lo, $2 hi, $3 step, $4 / $5 whether lo / hi were written.
+  step_list: "py_list_slice_step($0, $1, $2, $3, $4, $5)"
+  step_text: "py_text_slice_step($0, $1, $2, $3, $4, $5)"
+
+# print(a, b, c): each part as text, joined by a space, as Python prints them.
+joined_builtins:
+  print: " "
+
+# Given a dict, these work on its keys, as Python iterates a dict.
+dict_args_as_keys: [sorted, list, min, max, sum]
+
+ignored_imports: [typing, math, decimal]
+
+# Floats and Decimals, as the registry gives them to every surface (AI3 alike).
+float_literal: "str_to_float($0)"
+float_type: Float
+modules: [math]
+module_constants:
+  "math.pi": { args: [], ret: Float, emit: "str_to_float(\"3.141592653589793\")" }
+  "math.e": { args: [], ret: Float, emit: "str_to_float(\"2.718281828459045\")" }
+  "math.inf": { args: [], ret: Float, emit: "str_to_float(\"inf\")" }
+
+# Sorting a list of tuples (lexicographic, stable): each element becomes an
+# order-preserving text key, and the list is ordered by the keys.
+sort_keys:
+  Int: "py_key_int($0)"
+  Text: "py_key_text($0)"
+  Bool: "py_key_bool($0)"
+# $0: the fold state (keys, items) — the list is read once; $1: reverse
+sort_by_keys: "py_sort_state($0, $1)"
+
+# str() / print() of a container is Python's repr: elements as below (a text
+# inside a container is quoted), lists [..], tuples (..), dicts {k: v}.
+str_builtin: str
+repr:
+  Int: "int_to_str($0)"
+  Float: "py_float_str($0)"
+  Bool: "py_bool_str($0)"
+  Text: "py_repr_text($0)"
+  Dec: "py_repr_dec($0)"
+  Unit: "\"None\""
+
+# `raise E(msg)` and a failed `assert`: abort with the message (exit 3).
+raise: "fail($0)"
+
+# Python truthiness, used wherever a condition is expected (`if xs:`,
+# `while queue:`, `not s`) and by `a or b` on two values of one type.
+truthy:
+  Int: "bool_not(int_eq($0, 0))"
+  Float: "bool_not(float_eq($0, int_to_float(0)))"
+  Dec: "bool_not(dec_eq($0, int_to_dec(0)))"
+  Text: "bool_not(text_eq($0, \"\"))"
+  Unit: "false"
+  "list[*]": "int_gt(list_len($0), 0)"
+  "dict[*]": "int_gt(py_dict_len($0), 0)"
+
+text:
+  get: "str_char($0, $1)"
+  len: "str_len($0)"
+
+loops:
+  pack: "value_make($*)"
+  field: "ctor_field($0, $1)"
+  fold: "fold($0, $1, $2)"
+  while: "loop_while($0, $1, $2, $3)"
+  # A while loop that has not finished after this many iterations faults
+  # (exit 3) instead of returning as if it had finished.
+  while_bound: 100000000
+  exhausted: "fail(\"PyAx: a while loop ran past 100000000 iterations\")"
+  range: "range($0, $1)"
+  unpack:
+    Int: "value_to_int($0)"
+    Text: "value_to_text($0)"
+    Bool: "value_to_bool($0)"
+    Float: "pyax_value_to_float($0)"
+    Dec: "pyax_value_to_dec($0)"
+    Bytes: "value_to_bytes($0)"       # a Bytes in loop state or a list (registry, like value_to_text)
+    Value: "$0"
+    "list[*]": "flatten(list_make($0))"
+    "tuple[*]": "$0"
+    "dict[*]": "$0"
+  defaults:
+    Int: "0"
+    Text: "\"\""
+    Bool: "false"
+    Float: "int_to_float(0)"
+    Dec: "int_to_dec(0)"
+    Unit: "@unit"
+    "list[*]": "list_make()"
+    "tuple[*]": "value_make()"
+    "dict[*]": "value_make(list_make(), list_make())"
+
+forbidden_statements:
+  break: "`break` is not in PyAx: put the loop in its own function and `return` from it"
+  continue: "`continue` is not in PyAx: put the rest of the loop body under an `if`"
+
+# Dropped from PyAx (2026-10-02): models rarely write them and each costs a
+# closure, a second meaning for a registry name, or a type we do not have.
+forbidden_calls:
+  map: "map() is not in PyAx; write a for loop or a list comprehension"
+  filter: "filter() is not in PyAx; write a for loop or a list comprehension"
+  input: "input() is not in PyAx; take values as arguments of main"
+  open: "open() is not in PyAx"
+  isinstance: "isinstance() is not in PyAx: every value has one static type"
+  set: "set() is not in PyAx; use a dict as a set"
+
+# The bridge exports each fn under its own name; `main` would collide with the
+# C entry symbol at link time. The program's entry is `def main(args: list[str])`,
+# built from pyax_main.coreir.
+renames:
+  main: pyax_main
+
+# `def main() -> None` is accepted: the entry is always passed the command
+# line, so a parameterless one gets an unused `list[str]` parameter.
+entry: pyax_main
+entry_param_type: "list[Text]"

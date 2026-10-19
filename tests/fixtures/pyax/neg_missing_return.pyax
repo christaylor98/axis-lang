@@ -1,0 +1,10 @@
+# expect-error: can reach its end without returning a value
+def sign(n: int) -> int:
+    if n > 0:
+        return 1
+    elif n < 0:
+        return -1
+
+
+def main(args: list[str]) -> int:
+    return sign(3)

@@ -1,0 +1,14 @@
+// AXIS_FN_REF_ARG_VERIFY_V1 — negative: fn-ref in a non-Fn parameter position.
+// `consume_unit` expects (Unit); we pass a fn-ref (fnref_unit_handler). Verifier
+// MUST reject the fn-ref where Unit is expected.
+//
+// Expected: Verification failed: TypeMismatch (expected = Unit type hash,
+// got = Fn type hash).
+
+fn fnref_unit_handler(x: Unit) -> Unit {
+  Unit()
+}
+
+fn fnref_neg_misplaced() -> Unit {
+  consume_unit(fnref_unit_handler)
+}

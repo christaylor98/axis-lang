@@ -1,0 +1,150 @@
+registry m1 0.1
+
+// M1 (Mechanical 1) Registry
+// Governed by: AXLANG_TYPE_SYSTEM_V2
+//
+// Invariants:
+//   REGISTRY_SINGLE_CONCRETE_CALLABLE
+//   NO_TYPE_DISPATCH_IN_IR
+//   VALUELIST_TAG_MANDATORY
+//   VALUE_RECEIVER_NOT_SENDER
+//
+// Valid types: Int  Text  Bool  Unit  Bytes  TextList  Value  ValueList
+//
+// M1-specific primitives. All identities use §5b rule: SHA-256 of UTF-8 function name.
+// Core primitives (int_add, bool_not, etc.) are inherited from axis.axreg.
+
+// ─────────── Type declarations ───────────
+//
+// Unit is intentionally not declared here: no fn in this registry uses it,
+// and registries/pilot_lowering.axreg (co-fed with this file in every
+// current invocation) is its sole owner — see cli_util::load_and_merge_registries.
+
+type Bool      = prim bool
+type Int       = prim int
+type Text      = prim text
+type Bytes     = prim bytes
+type Value     = prim value
+type Dec       = prim dec
+type ValueList = list Value
+
+// Fn — a registry fn reference passed as an argument (e.g. wait(handler)).
+// Per axis_core_ir_0_5.capnp lines 50-58, 178-186: a fn-ref is a typed
+// constant pool entry whose defHash is this Fn type and whose payload is
+// the target fn's 32-byte minted identity hash. No inline abstraction.
+type Fn        = prim fn
+
+// ─────────── Value compound operations ───────────
+
+// value_make: construct a compound Value from 1-3 positional slots.
+// Arity at the call site is 1, 2, or 3 — enforced by the M1 validator.
+// Registry declares the variadic form; validator enforces the arity constraint.
+fn value_make
+  identity 0xf334e7070de9e3c1d96b5b5bf067a3cbe9ad00697911f1427626455d82242aee
+  kind leaf
+  in ()
+  out Value
+  effect pure
+  deterministic true
+  idempotent true
+  variadic true
+end
+
+// value_0: extract slot 0 from a compound Value.
+// Surface validator resolves concrete return type from constructor tag.
+fn value_0
+  identity 0x057252abf2527ae64308dd0f021b53c65cf8d09f9aa0e1dc7354b1a88cef3164
+  kind leaf
+  in (Value)
+  out Value
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// value_1: extract slot 1 from a compound Value.
+fn value_1
+  identity 0xb2176b0f78f70abef1b985c4fb1937377e0193104beb1cff96a95d515a1e275d
+  kind leaf
+  in (Value)
+  out Value
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// value_2: extract slot 2 from a compound Value.
+fn value_2
+  identity 0xcf31a42f7a5271421284f8550ac5d41225807c892d1a920bd9afcd907f5b2497
+  kind leaf
+  in (Value)
+  out Value
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// ─────────── ValueList construction ───────────
+
+// list_make: construct a ValueList from elements.
+// Element type tag is mandatory at surface (enforced by validator).
+// Core IR receives bare ValueList — tag is surface-only.
+fn list_make
+  identity 0x5a4f0bc00a7694307c987e5053c11d14e381d49b2996c97ac3b206527e3ed26e
+  kind leaf
+  in ()
+  out ValueList
+  effect pure
+  deterministic true
+  idempotent true
+  variadic true
+end
+
+// ─────────── HOF operations ───────────
+
+// sort: sort a ValueList using a comparator lambda.
+// Lambda argument type is NOT checked here (trusted to AI).
+// Lambda must ultimately return Bool — enforced by leaf CCall guards.
+fn sort
+  identity 0x646964943fd2271187dbe29287f57e0238491c029cc6d8ce76f25ae240474294
+  kind leaf
+  in (ValueList, Value)
+  out ValueList
+  effect pure
+  deterministic false
+  idempotent false
+end
+
+// filter: filter a ValueList using a predicate lambda returning Bool.
+fn filter
+  identity 0xdfc3376b8266c66e8c24736645128a5f93ccf1df6f381286ffbda654fec8f21c
+  kind leaf
+  in (ValueList, Value)
+  out ValueList
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// map: transform a ValueList element-by-element via a lambda.
+// Output element type is inferred from lambda return at the surface.
+fn map
+  identity 0x60be9861750facbfad8758254a2f76c0cfe78d54459a3bc187d49b1401fcd8e8
+  kind leaf
+  in (ValueList, Value)
+  out ValueList
+  effect pure
+  deterministic true
+  idempotent false
+end
+
+// reduce: fold a ValueList with an accumulator lambda and initial value.
+fn reduce
+  identity 0x4c7e98bfa0c750beb52cf2ddf452297d55681dc9efa8e9725d4334e981ae61ad
+  kind leaf
+  in (ValueList, Value, Value)
+  out Value
+  effect pure
+  deterministic true
+  idempotent false
+end

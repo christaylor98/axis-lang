@@ -1,0 +1,5 @@
+# expect-error: neg_int_plus_str.pyax:5:18:
+# expect-error: `+` is not defined for (str, int)
+def main(args: list[str]) -> int:
+    label = "n="
+    return label + 1

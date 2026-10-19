@@ -1,0 +1,11 @@
+# expect-exit: 3
+# raise aborts the program with its message (Unknown, exit 3)
+def check(n: int) -> int:
+    if n < 0:
+        raise ValueError("negative")
+    return n
+
+
+def main(args: list[str]) -> int:
+    print(check(5))
+    return check(-1)

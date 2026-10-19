@@ -1,0 +1,7 @@
+// Matrix fixture: LamExpr as let-binding value (RULE 2 violation — escaping)
+// The lambda is bound to 'g' via a let expression. It escapes as a value, not
+// as a direct CallExpr argument. Rejected at validation.
+fn f(x: Bool) -> Bool {
+  let g = fn(a) { a }
+  g
+}

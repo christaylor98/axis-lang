@@ -5,11 +5,11 @@
 // - Complete backtracking (restore position on failure)
 // - Correct error reporting
 
-use axis_lang_lab::frontend::parser_runtime::parse_with_spec;
-use axis_lang_lab::frontend::parserspec::{
+use axis_lang::frontend::parser_runtime::parse_with_spec;
+use axis_lang::frontend::parserspec::{
     Element, ParserSpec, Production, Terminal, TerminalSource,
 };
-use axis_lang_lab::frontend::token::{Span, Token, TokenKind};
+use axis_lang::frontend::token::{Span, Token, TokenKind};
 use std::collections::HashMap;
 
 // Helper to create tokens

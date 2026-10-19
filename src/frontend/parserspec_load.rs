@@ -320,6 +320,7 @@ mod tests {
                         pattern: r"\d+".to_string(),
                         base: 10,
                     }),
+                    float: None,
                     bool: None,
                     unit: None,
                     string: None,
@@ -336,6 +337,7 @@ mod tests {
                     "|".to_string(),
                     "=>".to_string(),
                 ],
+                layout: None,
             },
         }
     }

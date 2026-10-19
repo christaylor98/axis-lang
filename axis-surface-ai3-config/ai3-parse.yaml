@@ -1,0 +1,232 @@
+# AI3 Parser Specification
+# Surface: surface-ai3
+# Version: 0.1
+#
+# AI3 = M1 + mandatory tail `return` + `;` statement separators.
+# Derived from axis-surface-m1-config/m1-parse.yaml. M1 is NOT modified.
+#
+# Deltas from M1 (three rules changed, two rules added):
+#   1. Body:        `LetBinding* Expr`  →  `LetBinding* ReturnStmt`   (FnDecl only)
+#   2. ReturnStmt:  NEW — `<KW_RETURN> Expr <PUNCT_;>?`
+#   3. BranchBody:  NEW — `LetBinding* Expr`, M1's Body verbatim (IfExpr only)
+#   4. LetBinding:  optional trailing `<PUNCT_;>`
+#   5. LetDecl:     optional trailing `<PUNCT_;>`
+# Everything else is byte-for-byte the M1 grammar.
+#
+# BODY IS UNSHARED — AI3_UNSHARE_BODY_V1, 2026-09-09.
+# Body is referenced by FnDecl ONLY. IfExpr's two branches reference BranchBody,
+# which is M1's Body rule verbatim: a branch tail is a bare Expr and stays
+# positional. `return` is required at a function tail and FORBIDDEN in an
+# if-branch tail.
+#
+# WHY. Measured, not reasoned. In the pre-language A/B the models complied with
+# `return` at fn tails 72/72 and inside if-branches 8/55; 24 of AI3's 53 failures
+# were if-branch-missing-return against 6 at fn tails. Mandatory `return` is not
+# what the models fight — the shared rule was. This reverses the sharing decision
+# taken in AI3_SURFACE_STEP1, on data that contradicted its reasoning.
+#
+# THE `;` IS OPTIONAL, NOT MANDATORY. Making it optional is what lets newline
+# double as a separator: `let a = f(); let b = g();` and `let a = f()\nlet b = g()`
+# are both well-formed, because whitespace (newline included) is skipped by the
+# lexer and statements juxtapose. Requiring `;` would forbid the newline form.
+#
+# NO LEFT RECURSION. Every rule below consumes a terminal or descends into a
+# strictly-shorter alternative before any self-reference. parser_runtime.rs has no
+# memo, no depth limit and no left-recursion guard, so a left-recursive rule would
+# core-dump rather than diagnose. ReturnStmt begins with <KW_RETURN>; Body's
+# `LetBinding*` element begins with <KW_LET>. Both are terminal-anchored.
+
+parser:
+  start: Program
+
+  grammar:
+
+    # ── TOP LEVEL ────────────────────────────────────────────────
+
+    Program:
+      - Item*
+
+    Item:
+      - FnDecl
+      - LetDecl
+
+    # fn name(param: Type, ...) -> ReturnType { Body }
+    FnDecl:
+      - <KW_FN> <IDENT> <PUNCT_(> TypedParamList <PUNCT_)> <"PUNCT_->"> TypeExpr <PUNCT_{> Body <PUNCT_}>
+
+    # Top-level let declaration (for simple programs / REPL-style)
+    # AI3 DELTA: optional trailing `;`
+    LetDecl:
+      - <KW_LET> <IDENT> <PUNCT_=> Expr <PUNCT_;>?
+
+    # ── TYPED PARAMETER LIST ─────────────────────────────────────
+
+    TypedParamList:
+      - TypedParam TypedParamRest*
+      - Empty
+
+    TypedParamRest:
+      - <PUNCT_,> TypedParam
+
+    TypedParam:
+      - <IDENT> <PUNCT_:> TypeExpr
+
+    # ── TYPE EXPRESSIONS ─────────────────────────────────────────
+    # These are surface-only tags. Core IR sees bare Value/ValueList.
+
+    TypeExpr:
+      - ValueTypeExpr       # Value(T1, T2, ...) — compound constructor tag
+      - ValueListTypeExpr   # ValueList(T) — list constructor tag
+      - PrimTypeExpr        # Int | Text | Bool | Unit | user-defined name
+
+    # Value(T1) | Value(T1, T2) | Value(T1, T2, T3)
+    # There is no limit on arity
+    ValueTypeExpr:
+      - <KW_VALUE> <PUNCT_(> TypeExpr TypeExprRest* <PUNCT_)>
+
+    TypeExprRest:
+      - <PUNCT_,> TypeExpr
+
+    # ValueList(T) — T must not be bare Value (enforced by validator)
+    ValueListTypeExpr:
+      - <KW_VALUELIST> <PUNCT_(> TypeExpr <PUNCT_)>
+
+    PrimTypeExpr:
+      - <KW_INT>
+      - <KW_TEXT>
+      - <KW_BOOL>
+      - <KW_UNIT>
+      - <KW_BYTES>
+      - <IDENT>
+
+    # ── BODY ─────────────────────────────────────────────────────
+    # FUNCTION body. Zero or more let-bindings followed by EXACTLY ONE
+    # mandatory `return`. Referenced by FnDecl and by nothing else.
+    #
+    # AI3 DELTA. In M1 the tail was a bare Expr and its position carried the
+    # meaning. In AI3 the tail is named. `LetBinding*` is terminal-anchored on
+    # <KW_LET>, so the repeat stops cleanly at `return` and ReturnStmt matches;
+    # the "exactly one, at the tail" property is structural, not a check.
+    #
+    # Body's AST projection is unchanged from M1 (children_excluding_last(0) /
+    # last_child) because ReturnStmt simply occupies the slot the bare Expr held.
+
+    Body:
+      - LetBinding* ReturnStmt
+
+    # AI3 DELTA — NEW RULE (AI3_UNSHARE_BODY_V1).
+    # BRANCH body. M1's `Body: LetBinding* Expr` verbatim, under a new name so
+    # the two tails can differ. Referenced by both branches of IfExpr and by
+    # nothing else.
+    #
+    # This is what makes `return` illegal in an if-branch tail: BranchBody's tail
+    # is `Expr`, and `return` is a keyword, not an Expr alternative. There is no
+    # check — the exclusion is structural, the same way the inclusion is at a
+    # function tail.
+    #
+    # NOT LEFT-RECURSIVE, for the same reason M1's Body is not: the `LetBinding*`
+    # element is terminal-anchored on <KW_LET>, and Expr's alternatives each
+    # consume a terminal before any self-reference.
+
+    BranchBody:
+      - LetBinding* Expr
+
+    # AI3 DELTA — NEW RULE.
+    # `return <expr>` with an optional trailing `;`. Eliminated during
+    # normalization by the transparent-unwrap mechanism; it never reaches NF
+    # admissibility or lowering, so it mints no NF node kind.
+    #
+    # NO TYPE CHECK. Checking `return`'s expression against the declared return
+    # type needs a scope, which no config stage has. Mandatory-but-unchecked is
+    # the intended step-1 state — the comprehension benefit comes from the syntax.
+    ReturnStmt:
+      - <KW_RETURN> Expr <PUNCT_;>?
+
+    # AI3 DELTA: optional trailing `;`
+    LetBinding:
+      - <KW_LET> <IDENT> <PUNCT_=> Expr <PUNCT_;>?
+
+    # ── EXPRESSIONS ──────────────────────────────────────────────
+
+    Expr:
+      - DetermineExpr         # determinacy discharge gate (⊥-elimination)
+      - IfExpr
+      - ValueConstructExpr    # Value(T1, T2)(e1, e2) — mandatory tag
+      - ValueListConstructExpr # ValueList(T)(e1, e2, ...) — mandatory tag
+      - CallExpr              # name(args) — registry call
+      - IntLit                # Int(42)
+      - TextLit               # Text("hello")
+      - BoolLit               # Bool(true) | Bool(false)
+      - UnitLit               # Unit()
+      - <IDENT>               # variable reference
+
+    # determine — author-written discharge of ⊥; lowers to CDeterminate gate node.
+    # Must be written explicitly; the compiler never inserts this automatically.
+    DetermineExpr:
+      - <KW_DETERMINE>
+
+    # if cond { then_body } else { else_body }
+    # AI3 DELTA (AI3_UNSHARE_BODY_V1): branches are BranchBody, not Body, so a
+    # branch tail is a bare Expr exactly as in M1 and `return` is forbidden there:
+    #   if c { f(x) } else { g(x) }              well-formed
+    #   if c { return f(x); } else { ... }       parse error
+    # Child indices are unchanged — one nonterminal is swapped for another in the
+    # same two slots — so IfExpr's AST projection (1/3/7) is untouched.
+    IfExpr:
+      - <KW_IF> Expr <PUNCT_{> BranchBody <PUNCT_}> <KW_ELSE> ElseTail
+
+    # AI3_ELSE_IF_V1 (experiment, ai3-attempt-v1): `else if` is sugar for `else { if ... }`. ElseTail is either a
+    # braced branch body or another IfExpr; both are unwrapped by `transparent` in normalization, so the NF (and
+    # the CoreIR) is exactly the nested-if form. The two alternatives start with different terminals ({ vs if).
+    ElseTail:
+      - ElseBlock
+      - IfExpr
+
+    ElseBlock:
+      - <PUNCT_{> BranchBody <PUNCT_}>
+
+    # ValueTypeArgs wraps the type-arg list so ValueConstructExpr has fixed child indices
+    ValueTypeArgs:
+      - TypeExpr TypeExprRest*
+
+    # Value(T1, T2)(e1, e2) — type tag mandatory at construction site
+    # Children: 0=KW_VALUE 1=PUNCT_( 2=ValueTypeArgs 3=PUNCT_) 4=PUNCT_( 5=ArgList 6=PUNCT_)
+    ValueConstructExpr:
+      - <KW_VALUE> <PUNCT_(> ValueTypeArgs <PUNCT_)> <PUNCT_(> ArgList <PUNCT_)>
+
+    # ValueList(T)(e1, e2, ...) or ValueList(T)[e1, e2, ...]
+    # ValueList(Value) is forbidden — enforced by validator
+    ValueListConstructExpr:
+      - <KW_VALUELIST> <PUNCT_(> TypeExpr <PUNCT_)> <PUNCT_(> ArgList <PUNCT_)>
+      - <KW_VALUELIST> <PUNCT_(> TypeExpr <PUNCT_)> <PUNCT_[> ArgList <PUNCT_]>
+
+    # name(arg, ...) — all function calls including HOFs and primitives
+    CallExpr:
+      - <IDENT> <PUNCT_(> ArgList <PUNCT_)>
+
+    ArgList:
+      - Expr ArgListRest*
+      - Empty
+
+    ArgListRest:
+      - <PUNCT_,> Expr
+
+    # ── LITERALS ─────────────────────────────────────────────────
+    # Typed constructor syntax. Constructors dissolve at lowering —
+    # the wrapper is surface discipline only; the IR sees a typed constant.
+
+    IntLit:
+      - <KW_INT> <PUNCT_(> <INT_LIT> <PUNCT_)>
+
+    TextLit:
+      - <KW_TEXT> <PUNCT_(> <STRING_LIT> <PUNCT_)>
+
+    BoolLit:
+      - <KW_BOOL> <PUNCT_(> <KW_TRUE> <PUNCT_)>
+      - <KW_BOOL> <PUNCT_(> <KW_FALSE> <PUNCT_)>
+
+    UnitLit:
+      - <KW_UNIT> <PUNCT_(> <PUNCT_)>
+
+    Empty:
+      -

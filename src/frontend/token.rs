@@ -30,6 +30,7 @@ pub enum TokenKind {
 
     // Literals
     IntLit,
+    FloatLit,
     BoolLit,
     StringLit,
     UnitLit,
@@ -51,6 +52,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Keyword(kw) => write!(f, "keyword '{}'", kw),
             TokenKind::Ident => write!(f, "identifier"),
             TokenKind::IntLit => write!(f, "int literal"),
+            TokenKind::FloatLit => write!(f, "float literal"),
             TokenKind::BoolLit => write!(f, "bool literal"),
             TokenKind::StringLit => write!(f, "string literal"),
             TokenKind::UnitLit => write!(f, "unit literal"),

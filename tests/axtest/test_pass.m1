@@ -1,0 +1,7 @@
+// Stage-0 test: PASS
+// This test passes unconditionally — it returns Unit without calling assert.
+// Stage-1 upgrade: replace the body with assert(Bool(true)) once the bridge
+// ships the assert runtime (BRIDGE_ENTRY_POINTS_V1).
+fn test_pass() -> Unit {
+  Unit()
+}

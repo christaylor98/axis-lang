@@ -1,7 +1,7 @@
 // Additional stress test for invariants - edge cases and boundary conditions
 
-use axis_lang_lab::frontend::lexer_engine::lex_with_spec;
-use axis_lang_lab::frontend::lexspec_load::load_spec;
+use axis_lang::frontend::lexer_engine::lex_with_spec;
+use axis_lang::frontend::lexspec_load::load_spec;
 use std::path::PathBuf;
 
 #[path = "wave6_invariants.rs"]

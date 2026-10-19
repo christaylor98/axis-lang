@@ -1,0 +1,9 @@
+// AXIS_FN_REF_ARG_VERIFY_V1 — negative: non-Fn constant in (Fn) position.
+// apply_handler expects (Fn); we pass Int(42). Verifier MUST reject.
+//
+// Expected: Verification failed: TypeMismatch (expected = Fn type hash,
+// got = Int type hash).
+
+fn fnref_neg_nonfn() -> Unit {
+  apply_handler(Int(42))
+}

@@ -1,0 +1,9 @@
+// AI3 fixture: SEPARATORS — newline only, not one semicolon in the file.
+// Newline is not a token (the lexer skips all whitespace); statements
+// juxtapose and newline separates them by convention. Must produce the same
+// bundle as ai3_sep_semicolon.ai3 and ai3_sep_mixed.ai3.
+fn s(a: Int, b: Int) -> Int {
+  let x = int_add(a, b)
+  let y = int_mul(x, Int(2))
+  return int_sub(y, a)
+}

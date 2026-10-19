@@ -1,0 +1,4 @@
+// AI3 fixture: Value construction in tail position.
+fn make(a: Bool, b: Bool) -> Value(Bool, Bool) {
+  return Value(Bool, Bool)(a, b);
+}

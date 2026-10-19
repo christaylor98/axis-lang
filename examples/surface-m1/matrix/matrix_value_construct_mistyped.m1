@@ -1,0 +1,5 @@
+// Matrix fixture: ValueConstructExpr — ill-typed (G2)
+// Value(Int) with a Text literal argument → type mismatch at validation.
+fn f() -> Value(Int) {
+  Value(Int)(Text("hello"))
+}

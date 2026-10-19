@@ -1,0 +1,7 @@
+// AI3 NEGATIVE: the verifier gate still bites through the new syntax.
+// int_add takes (Int, Int); a Bool literal is passed instead.
+// Rejected at VERIFICATION, not at parse — proof that eliminating `return`
+// at normalization does not weaken anything downstream.
+fn n(a: Int) -> Int {
+  return int_add(a, Bool(true));
+}

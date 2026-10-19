@@ -3,7 +3,7 @@
 // This test shows concrete examples of the fail-loud behavior
 // when registry authority is violated
 
-use axis_lang_lab::registry::Registry;
+use axis_lang::registry::Registry;
 
 #[test]
 fn demo_fail_loud_old_function_keyword() {

@@ -1,0 +1,6 @@
+// AI3 fixture: literal tail.
+// Byte-identity anchor t1_literal — must equal the M1 bundle for
+//   fn t1() -> Int { Int(42) }
+fn t1() -> Int {
+  return Int(42);
+}

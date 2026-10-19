@@ -1,0 +1,13 @@
+# expect-exit: 0
+# dict(), dict(d), dict(pairs) with a repeated key, dict(zip(ks, vs))
+def main() -> None:
+    pairs = [("a", 1), ("b", 2), ("a", 3)]
+    d = dict(pairs)
+    e = dict(d)
+    e["z"] = 9
+    ks = ["x", "y", "z"]
+    vs = [1, 2]
+    f = dict(zip(ks, vs))
+    g: dict[str, int] = dict()
+    g["q"] = 1
+    print(d, e, f, g, len(dict(zip(ks, ks))))

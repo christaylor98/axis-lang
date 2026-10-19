@@ -1,0 +1,4 @@
+// Matrix fixture: LetDecl
+// Top-level let declaration (no type annotation in M1 LetDecl).
+// Value is an IntLit — CVar nodes no longer exist in Core IR 0.5.
+let x = Int(42)

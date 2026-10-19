@@ -6,7 +6,9 @@ lexer:
     pattern: "[ \\t\\n\\r]+"
     skip: true
 
-  comments: []
+  comments:
+    - pattern: "//.*"
+      skip: true
 
   keywords:
     - fn

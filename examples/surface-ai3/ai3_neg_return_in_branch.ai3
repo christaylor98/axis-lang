@@ -1,0 +1,11 @@
+// AI3 NEGATIVE: `return` inside an if-branch tail.
+// AI3_UNSHARE_BODY_V1 inverted this fixture. It used to assert the opposite —
+// that a branch tail REQUIRED its own `return`, because Body was shared with
+// IfExpr. Body is now unshared: IfExpr's branches are BranchBody, whose tail is
+// a bare Expr, and `return` is not an Expr alternative. So this is a parse error.
+//
+// The exclusion is structural, not a check. Nothing rejects `return` by name;
+// there is simply no rule position that admits it here.
+fn n(c: Bool) -> Int {
+  return if c { return Int(1); } else { return Int(2); };
+}

@@ -1,0 +1,26 @@
+# expect-exit: 0
+# A pure operation used in both arms of an if runs only on the path that uses it (PURE_NODES_STAY_IN_THEIR_BRANCHES_V1).
+# Before: the bridge hoisted it above the if, so `base * base` overflowed in the pass that doesn't square (2 ** 40),
+# and int(args[k]) shared by several elif arms ran for a mode without that argument.
+def guarded(x: int, k: int) -> int:
+    out = x
+    if k > 0:
+        out = x * x
+    return out
+
+
+def pick(args: list[str]) -> int:
+    mode = args[0]
+    if mode == "one":
+        return int(args[1])
+    elif mode == "two":
+        return int(args[1]) + int(args[2])
+    elif mode == "three":
+        return int(args[1]) + int(args[2]) + int(args[3])
+    return 0
+
+
+def main() -> None:
+    print(2 ** 40, 3 ** 39, 10 ** 18)
+    print(guarded(4294967296, 0), guarded(3, 1))
+    print(pick(["one", "5"]), pick(["two", "5", "6"]), pick(["three", "1", "2", "3"]), pick(["zero"]))

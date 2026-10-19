@@ -1,0 +1,27 @@
+# expect-exit: 0
+# Python truthiness in conditions, `not`, while, comprehension filters, and
+# `a or b` on two values of one type
+def describe(xs: list[int], name: str, d: dict[str, int], n: int) -> str:
+    out = ""
+    if xs:
+        out += "xs "
+    if not name:
+        out += "noname "
+    if d and n:
+        out += "both "
+    if not d or not n:
+        out += "one-empty "
+    return out + (name or "anon")
+
+
+def main(args: list[str]) -> int:
+    print(describe([1], "", {"a": 1}, 0))
+    print(describe([], "bo", {}, 3))
+    queue = [3, 2, 1]
+    total = 0
+    while queue:
+        total += queue.pop()
+    words = ["a", "", "b", ""]
+    print([w for w in words if w], total)
+    print(len(args) > 0 and args[0] == "x")
+    return 0

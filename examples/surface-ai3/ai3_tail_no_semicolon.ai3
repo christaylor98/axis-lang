@@ -1,0 +1,6 @@
+// AI3 fixture: the `;` is OPTIONAL, not mandatory.
+// Same source as ai3_tail_call.ai3 with every semicolon removed. Must produce
+// the same bundle. This is what lets newline serve as a separator.
+fn t2(a: Int, b: Int) -> Int {
+  return int_add(a, b)
+}

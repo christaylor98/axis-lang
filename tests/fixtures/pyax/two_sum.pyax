@@ -1,0 +1,19 @@
+# expect-exit: 0
+# first-store across a loop: `seen` is read (in, []) before the store that
+# types it, which comes later in the body (two-pass discovery)
+def two_sum(xs: list[int], target: int) -> str:
+    seen = {}
+    for j, x in enumerate(xs):
+        complement = target - x
+        if complement in seen:
+            i = seen[complement]
+            return f"{i},{j}"
+        seen[x] = j
+    return "none"
+
+
+def main(args: list[str]) -> int:
+    print(two_sum([2, 7, 11, 15], 9))
+    print(two_sum([3, 2, 4], 6))
+    print(two_sum([1, 2], 7))
+    return 0

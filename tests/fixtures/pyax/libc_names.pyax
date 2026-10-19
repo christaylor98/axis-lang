@@ -1,0 +1,30 @@
+# expect-exit: 0
+# User functions may share a name with a C library symbol: the bridge no longer exports a function's plain name
+# unmangled (a `def write` took over libc's write(2) and the first print crashed the program). Calls between bundles
+# go through the identity symbol (ax_fn_<hash>), which is unaffected.
+def write(x: int) -> int:
+    return x + 1
+
+
+def read(x: int) -> int:
+    return x * 2
+
+
+def close(s: str) -> str:
+    return s + "!"
+
+
+def free(xs: list[int]) -> int:
+    return len(xs)
+
+
+def time(a: int, b: int) -> int:
+    return a - b
+
+
+def send(s: str) -> str:
+    return s.upper()
+
+
+def main() -> None:
+    print(write(1), read(2), close("done"), free([1, 2, 3]), time(9, 4), send("ok"))

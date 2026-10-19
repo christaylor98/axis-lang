@@ -10,6 +10,20 @@
 # The structure mirrors semantic-surface-0-ast.yaml because the CST node names match.
 
 nodes:
+  # Program: root node produced by the parser (wraps the reduced expression)
+  Program:
+    match: "Program"
+    fields:
+      items:
+        from: "children(0..)"
+
+  # Item: transparent wrapper around the reduced expression node
+  Item:
+    match: "Item"
+    fields:
+      variant:
+        from: "child(0)"
+
   # Integer literal: produced by postfix reduction from INT token
   IntLit:
     match: "IntLit"

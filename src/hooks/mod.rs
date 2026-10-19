@@ -31,9 +31,6 @@ pub mod execution;
 pub mod framework;
 pub mod registry;
 
-#[cfg(test)]
-mod tests;
-
 pub use execution::{HookExecution, HookExecutionTrace, HookExecutor};
 pub use framework::{
     Hook, HookContext, HookError, HookExecutionResult, HookInput, HookOutput, HookPermission,

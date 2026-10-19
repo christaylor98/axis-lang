@@ -1,0 +1,4 @@
+// AI3 fixture: Text literal tail.
+fn f() -> Text {
+  return Text("hello");
+}

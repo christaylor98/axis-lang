@@ -1,0 +1,5 @@
+# expect-error: neg_mixed_list.pyax:4:14:
+# expect-error: list elements must all be int; this one is str
+def main(args: list[str]) -> int:
+    xs = [1, "a"]
+    return len(xs)

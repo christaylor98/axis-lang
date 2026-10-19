@@ -1,0 +1,4 @@
+// Matrix fixture: LamExpr in argument position — legal (non-capturing, direct CallExpr arg)
+// RULE 1: fn(a){a} body only references its own param 'a'. No capture.
+// RULE 2: LamExpr appears as a direct argument to const_unit(...). Legal position.
+fn f(x: Bool) -> Unit { const_unit(fn(a) { a }) }

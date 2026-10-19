@@ -1,0 +1,4 @@
+// AI3 fixture: ValueList construction in tail position.
+fn make(a: Bool) -> ValueList(Bool) {
+  return ValueList(Bool)(a);
+}

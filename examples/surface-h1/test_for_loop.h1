@@ -1,6 +1,5 @@
 // Test: for loop construct
-// This tests: ForExpr desugaring target
-// Expected: Parses successfully, fails NF validation
+// Expected: FAIL at NF validation (ForExpr is in forbidden set)
 
 fn count(n) {
   for i in n {

@@ -1,0 +1,106 @@
+// pyax.axreg — PyAx-local registry (PYAX_SURFACE_EXPAND_V1 phase 2).
+//
+// Callables PyAx needs that the shared registry lacks. Each is an EXISTING
+// bridge runtime function, linked by pyax-dispatch.toml (identity =
+// sha256(name), the bridge's built-in rule): no bridge or axRegistry change.
+// Candidates to promote into axRegistry.
+registry pyax 0.5
+
+// O(1) element of a ValueList. The shared registry's list_get is typed
+// (Value, Int) and a ValueList is not admitted as a Value, so a typed list
+// had no constant-time getter. Runtime: runtime::list::list_get.
+fn pyax_list_get
+  identity 0xcc7f80017166d85c66fd4b1aa808307041c7a84534599e85fd440015b07024b6
+  kind leaf
+  in (ValueList, Int)
+  out Value
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// A TextList (e.g. str_split's result) as the ValueList PyAx's list[str] is.
+// Both are a runtime List of Str; this links to runtime::list::
+// value_list_to_text_list, which checks every element is a Str and returns
+// its input — for a TextList, an identity.
+fn pyax_text_list_widen
+  identity 0x78515bb5970d2499a04c1365593be4419dca422e1b0dea013b382c2ede14d883
+  kind leaf
+  in (TextList)
+  out ValueList
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// IntList / BoolList results of registry functions as PyAx's list[int] /
+// list[bool], exactly as pyax_text_list_widen does for TextList. Runtime:
+// value_list_to_int_list / value_list_to_bool_list, which check each element
+// and return their input — for an IntList / BoolList, an identity.
+fn pyax_int_list_widen
+  identity 0x438a9035b66b3921b426710bf0bfae909abb8bbc7a6e6a4d94b32ba70b691a2c
+  kind leaf
+  in (IntList)
+  out ValueList
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+fn pyax_bool_list_widen
+  identity 0xc2afa58ad443b366260c6362b9ba215e7586063cf2d36c0890ea485bf1db58c3
+  kind leaf
+  in (BoolList)
+  out ValueList
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// A ValueList reversed (`xs[::-1]`). The shared registry's list_reverse is
+// typed (Value) -> Value. Runtime: runtime::list::list_reverse.
+fn pyax_list_reverse
+  identity 0xee7ce436fb6f8dd344ab1c7786c208320e7810d5aee4824b25dbe5c7355f492a
+  kind leaf
+  in (ValueList)
+  out ValueList
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// A Value known to hold a Float, as a Float (loop state, list elements). Links to
+// runtime::coerce::float_id, which checks the tag and returns its input.
+fn pyax_value_to_float
+  identity 0x78afdd4730304b2bc40a8c08ccae09ce683c5ac5f3dbe9047b6c92c864abdfee
+  kind leaf
+  in (Value)
+  out Float
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// A Value known to hold a Dec, as a Dec (loop state, list elements). Links to
+// runtime::coerce::dec_id, which checks the tag and returns its input.
+fn pyax_value_to_dec
+  identity 0xe3565d04b8f0d5020a42291104a2a5af271a7dadfc3a03a7fe8aab3dcb7fbea4
+  kind leaf
+  in (Value)
+  out Dec
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// Python == on two lists (element-wise). The shared value_eq is typed
+// (Value, Value), which a ValueList does not satisfy. Runtime: arith::value_eq.
+fn pyax_list_eq
+  identity 0x8ad3def1e834d6f15bc310d85c0b7898047656a77b9eb0836eec8b741374cff5
+  kind leaf
+  in (ValueList, ValueList)
+  out Bool
+  effect pure
+  deterministic true
+  idempotent true
+end

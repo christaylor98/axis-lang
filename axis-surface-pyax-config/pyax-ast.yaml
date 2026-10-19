@@ -1,0 +1,692 @@
+# PyAx AST Schema
+# Surface: surface-pyax (PYAX_SURFACE_EXPAND_V1)
+# Version: 0.1
+#
+# Child indices count ALL children, tokens included, 0-based — the layout
+# tokens NEWLINE / INDENT / DEDENT are children like any other.
+#
+# The field names are the expand engine's role contract
+# (src/normalize/expand_engine.rs header): expand reads these shapes and
+# pyax-expand.yaml maps each role to the kind below.
+
+nodes:
+
+  Program:
+    fields:
+      items:
+        from: children(0..)
+
+  Item:
+    fields:
+      variant:
+        from: child(0)
+
+  # The module is the first IDENT.
+  ImportStmt:
+    fields:
+      module:
+        from: token(IDENT)
+
+  ImportNames:
+    fields: {}
+
+  ImportRest:
+    fields: {}
+
+  # <def> IDENT ( TypedParamList ) RetAnn : NEWLINE INDENT Block DEDENT
+  #   0     1   2       3        4    5   6    7      8     9     10
+  FnDecl:
+    fields:
+      name:
+        from: token(IDENT)
+      params:
+        from: child(3)
+      return_type:
+        from: child(5)
+      body:
+        from: child(9)
+
+  TypedParamList:
+    fields:
+      params:
+        from: children(0..)
+
+  TypedParamRest:
+    fields:
+      param:
+        from: child(1)
+
+  TypedParam:
+    fields:
+      name:
+        from: token(IDENT)
+      type_expr:
+        from: child(2)
+      default:
+        from: children(3..)
+
+  ParamDefault:
+    fields:
+      value:
+        from: child(1)
+
+  # `-> T` gives [->, T]; no annotation gives [Empty]. children(1..) is then
+  # [T] or [] — zero or one type.
+  RetAnn:
+    fields:
+      type:
+        from: children(1..)
+
+  TypeExpr:
+    fields:
+      variant:
+        from: child(0)
+
+  # IDENT [ TypeExpr TypeRest* ]
+  GenericType:
+    fields:
+      name:
+        from: token(IDENT)
+      args:
+        from: children_excluding_last(2)
+
+  TypeRest:
+    fields:
+      type_expr:
+        from: child(1)
+
+  NamedType:
+    fields:
+      name:
+        from: first_token
+
+  # Every child is a Stmt node.
+  Block:
+    fields:
+      bindings:
+        from: children_excluding_last(0)
+      result:
+        from: last_child
+
+  Stmt:
+    fields:
+      variant:
+        from: child(0)
+
+  # child(1) is the ExprList, or the NEWLINE of a bare `return` (a token,
+  # which expand reads as None).
+  ReturnStmt:
+    fields:
+      expr:
+        from: child(1)
+
+  RaiseStmt:
+    fields:
+      exc:
+        from: child(1)
+
+  # <assert> Expr AssertMsg? NEWLINE
+  AssertStmt:
+    fields:
+      condition:
+        from: child(1)
+      msg:
+        from: children_excluding_last(2)
+
+  AssertMsg:
+    fields:
+      msg:
+        from: child(1)
+
+  # <del> IDENT [ Expr ] NEWLINE
+  DelStmt:
+    fields:
+      name:
+        from: token(IDENT)
+      index:
+        from: child(3)
+
+  TupleAssignStmt:
+    fields:
+      target:
+        from: child(0)
+      value:
+        from: child(2)
+
+  TargetList:
+    fields:
+      names:
+        from: tokens(IDENT)
+
+  # IDENT [ Expr ] op= Expr NEWLINE
+  AugSubAssignStmt:
+    fields:
+      name:
+        from: token(IDENT)
+      index:
+        from: child(2)
+      op:
+        from: child_token(4)
+      value:
+        from: child(5)
+
+  PassStmt:
+    fields: {}
+
+  BreakStmt:
+    fields: {}
+
+  ContinueStmt:
+    fields: {}
+
+  # <for> ForTarget <in> Expr : NEWLINE INDENT Block DEDENT
+  #   0      1       2    3   4    5      6     7     8
+  ForStmt:
+    fields:
+      target:
+        from: child(1)
+      iter:
+        from: child(3)
+      body:
+        from: child(7)
+
+  ForTarget:
+    fields:
+      names:
+        from: tokens(IDENT)
+
+  # <while> Expr : NEWLINE INDENT Block DEDENT
+  WhileStmt:
+    fields:
+      condition:
+        from: child(1)
+      body:
+        from: child(5)
+
+  # IDENT op= Expr NEWLINE
+  AugAssignStmt:
+    fields:
+      name:
+        from: token(IDENT)
+      op:
+        from: child_token(1)
+      value:
+        from: child(2)
+
+  # IDENT [ Expr ] = Expr NEWLINE
+  SubAssignStmt:
+    fields:
+      name:
+        from: token(IDENT)
+      index:
+        from: child(2)
+      value:
+        from: child(5)
+
+  # <if> Expr : NEWLINE INDENT Block DEDENT ElseTail
+  #   0   1   2    3      4     5     6       7
+  IfStmt:
+    fields:
+      condition:
+        from: child(1)
+      then_branch:
+        from: child(5)
+      orelse:
+        from: child(7)
+
+  ElifClause:
+    fields:
+      condition:
+        from: child(1)
+      then_branch:
+        from: child(5)
+      orelse:
+        from: child(7)
+
+  ElseTail:
+    fields:
+      variant:
+        from: child(0)
+
+  # <else> : NEWLINE INDENT Block DEDENT
+  ElseClause:
+    fields:
+      block:
+        from: child(4)
+
+  # IDENT : TypeExpr = Expr NEWLINE
+  AnnAssignStmt:
+    fields:
+      name:
+        from: token(IDENT)
+      type_expr:
+        from: child(2)
+      value:
+        from: child(4)
+
+  AssignStmt:
+    fields:
+      name:
+        from: token(IDENT)
+      value:
+        from: child(2)
+
+  ExprStmt:
+    fields:
+      expr:
+        from: child(0)
+
+  # ── EXPRESSIONS ──────────────────────────────────────────────
+
+  ExprList:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  # `, Expr` gives [Expr]; a trailing `,` gives [].
+  TupleRest:
+    fields:
+      item:
+        from: children(1..)
+
+  Expr:
+    fields:
+      value:
+        from: child(0)
+      tail:
+        from: children(1..)
+
+  # <if> OrExpr <else> Expr
+  CondTail:
+    fields:
+      condition:
+        from: child(1)
+      orelse:
+        from: child(3)
+
+  OrExpr:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  OrRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  AndExpr:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  AndRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  NotExpr:
+    fields:
+      variant:
+        from: child(0)
+
+  NotOp:
+    fields:
+      operand:
+        from: child(1)
+
+  Comparison:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  CmpRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  BitOr:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  BitOrRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  BitXor:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  BitXorRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  BitAnd:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  BitAndRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  Shift:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  ShiftRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  Sum:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  SumRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  Term:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  TermRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  Factor:
+    fields:
+      variant:
+        from: child(0)
+
+  NegOp:
+    fields:
+      operand:
+        from: child(1)
+
+  InvOp:
+    fields:
+      operand:
+        from: child(1)
+
+  # A chain of at most one `**` (right-associative through Factor).
+  Power:
+    fields:
+      first:
+        from: child(0)
+      rest:
+        from: children(1..)
+
+  PowRest:
+    fields:
+      op:
+        from: first_token
+      operand:
+        from: last_child
+
+  Postfix:
+    fields:
+      atom:
+        from: child(0)
+      trailers:
+        from: children(1..)
+
+  Trailer:
+    fields:
+      variant:
+        from: child(0)
+
+  CallTrailer:
+    fields:
+      args:
+        from: child(1)
+
+  # . IDENT ( ArgList )
+  MethodTrailer:
+    fields:
+      name:
+        from: token(IDENT)
+      args:
+        from: child(3)
+
+  IndexTrailer:
+    fields:
+      index:
+        from: child(1)
+
+  # [ SliceBound : SliceBound SliceStep? ]
+  # 0     1      2     3        4..     last
+  SliceTrailer:
+    fields:
+      lo:
+        from: child(1)
+      hi:
+        from: child(3)
+      step:
+        from: children_excluding_last(4)
+
+  SliceBound:
+    fields:
+      variant:
+        from: child(0)
+
+  SliceStep:
+    fields:
+      bound:
+        from: child(1)
+
+  # { DictItem DictRest* }  or  { }  — the items lie strictly between the braces
+  DictLit:
+    fields:
+      items:
+        from: children_excluding_last(1)
+
+  # `k: v`, or a DictSpread (then `key` is the spread node and `value` is absent)
+  DictItem:
+    fields:
+      key:
+        from: child(0)
+      value:
+        from: children(2..)
+
+  DictSpread:
+    fields:
+      value:
+        from: child(1)
+
+  DictRest:
+    fields:
+      item:
+        from: children(1..)
+
+  # FSTR_BEGIN FPart* FSTR_END
+  FString:
+    fields:
+      parts:
+        from: children_excluding_last(1)
+
+  FPart:
+    fields:
+      variant:
+        from: child(0)
+
+  FExpr:
+    fields:
+      expr:
+        from: child(1)
+
+  Atom:
+    fields:
+      variant:
+        from: child(0)
+
+  # first_token, not token(FLOAT_LIT): schema_ast.rs tokens_match has no
+  # FloatLit arm, so token(FLOAT_LIT) never matches.
+  FloatLit:
+    fields:
+      value:
+        from: first_token
+
+  AttrTrailer:
+    fields:
+      name:
+        from: token(IDENT)
+
+  IntLit:
+    fields:
+      value:
+        from: token(INT_LIT)
+
+  TextLit:
+    fields:
+      value:
+        from: token(STRING_LIT)
+
+  BoolLit:
+    fields:
+      value:
+        from: first_token
+
+  NoneLit:
+    fields: {}
+
+  Name:
+    fields:
+      name:
+        from: token(IDENT)
+
+  ParenExpr:
+    fields:
+      inner:
+        from: child(1)
+
+  ListLit:
+    fields:
+      args:
+        from: child(1)
+
+  # [ Expr <for> ForTarget <in> OrExpr CompIf? ]
+  # 0  1     2      3       4     5      6..   last
+  ListComp:
+    fields:
+      elem:
+        from: child(1)
+      target:
+        from: child(3)
+      iter:
+        from: child(5)
+      cond:
+        from: children_excluding_last(6)
+
+  # Expr <for> ForTarget <in> OrExpr CompIf?
+  GenExpr:
+    fields:
+      elem:
+        from: child(0)
+      target:
+        from: child(2)
+      iter:
+        from: child(4)
+      cond:
+        from: children(5..)
+
+  # { Expr : Expr <for> ForTarget <in> OrExpr CompIf? }
+  # 0   1   2   3    4      5       6     7      8..  last
+  DictComp:
+    fields:
+      key:
+        from: child(1)
+      elem:
+        from: child(3)
+      target:
+        from: child(5)
+      iter:
+        from: child(7)
+      cond:
+        from: children_excluding_last(8)
+
+  CompIf:
+    fields:
+      condition:
+        from: child(1)
+
+  ArgList:
+    fields:
+      args:
+        from: children(0..)
+
+  ArgRest:
+    fields:
+      arg:
+        from: child(1)
+
+  Arg:
+    fields:
+      variant:
+        from: child(0)
+
+  KwArg:
+    fields:
+      name:
+        from: token(IDENT)
+      value:
+        from: child(2)
+
+  ConstDecl:
+    fields:
+      variant:
+        from: child(0)
+
+  ModuleDoc:
+    fields: {}
+
+  Empty:
+    fields: {}

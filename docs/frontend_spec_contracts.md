@@ -1,8 +1,8 @@
-# Axis Language Lab — Frontend Specification Contracts
+# Axis Lang — Frontend Specification Contracts
 
 ## Document Authority
 
-This document describes the **exact** contracts for all frontend specification files consumed by the Axis Language Lab pipeline.
+This document describes the **exact** contracts for all frontend specification files consumed by the Axis Lang pipeline.
 
 **Version**: Wave 1  
 **Status**: Authoritative  

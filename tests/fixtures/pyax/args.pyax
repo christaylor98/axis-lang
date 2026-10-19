@@ -1,0 +1,7 @@
+# args: x y
+# expect-exit: 0
+# the entry receives the command line
+def main(args: list[str]) -> int:
+    n = len(args)
+    print("got " + str(n) + " args")
+    return n

@@ -1,0 +1,5 @@
+# expect-error: neg_unknown_type.pyax:5:12:
+# expect-error: annotate the variable it comes from
+def main(args: list[str]) -> int:
+    n = ctor_field(value_make(1), 0)
+    return n + 1

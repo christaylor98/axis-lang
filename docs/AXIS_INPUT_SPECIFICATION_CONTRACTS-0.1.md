@@ -1,8 +1,8 @@
-# Axis Language Lab — Input Specification Contracts
+# Axis Lang — Input Specification Contracts
 
 ## 1. Scope and Authority
 
-This document defines all user-supplied input files required by the Axis Language Lab compilation pipeline.
+This document defines all user-supplied input files required by the Axis Lang compilation pipeline.
 
 A user input is a file that:
 - Defines lexical structure, syntactic grammar, AST schema, or semantic lowering rules

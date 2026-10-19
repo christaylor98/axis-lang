@@ -1,0 +1,18 @@
+# expect-exit: 0
+# str methods and f-free string building
+def greet(name: str, shout: bool) -> str:
+    s = "hello, " + name
+    if shout:
+        return s.upper() + "!"
+    return s
+
+
+def main(args: list[str]) -> int:
+    print(greet("ada", False))
+    print(greet("ada", True))
+    t = "  padded  "
+    print("[" + t.strip() + "]")
+    print(str("banana".startswith("ban")))
+    print(str("banana".find("na")))
+    print("a-b-c".replace("-", "+"))
+    return len("banana".lower())

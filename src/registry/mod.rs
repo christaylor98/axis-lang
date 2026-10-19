@@ -1,3 +1,7 @@
+// Core IR 0.5 registry (Phase 1 of the migration). The legacy 0.3 model below
+// is unchanged; lowerings still target it and migrate onto `core05` in Phase 3.
+pub mod core05;
+
 use std::fs;
 use std::path::Path;
 
@@ -73,7 +77,7 @@ impl Registry {
             // compilation MUST fail.
             let has_content = s.lines().any(|line| {
                 let trimmed = line.trim();
-                !trimmed.is_empty() && !trimmed.starts_with("//") && !trimmed.starts_with('#') && !trimmed.starts_with("registry ")
+                !trimmed.is_empty() && !trimmed.starts_with("//") && !trimmed.starts_with("registry ")
             });
             
             if has_content && parsed.is_empty() {
@@ -118,21 +122,15 @@ impl Registry {
             if trimmed.is_empty() {
                 continue;
             }
-            // Skip comment lines (// and #)
-            if trimmed.starts_with("//") || trimmed.starts_with('#') {
+            // Skip comment lines
+            if trimmed.starts_with("//") {
                 continue;
             }
-            // Strip inline comments (// and #)
-            let clean = {
-                let pos_slash = trimmed.find("//");
-                let pos_hash = trimmed.find('#');
-                let pos = match (pos_slash, pos_hash) {
-                    (Some(a), Some(b)) => Some(a.min(b)),
-                    (Some(a), None) => Some(a),
-                    (None, Some(b)) => Some(b),
-                    (None, None) => None,
-                };
-                if let Some(p) = pos { trimmed[..p].trim() } else { trimmed }
+            // Strip inline comments
+            let clean = if let Some(pos) = trimmed.find("//") {
+                trimmed[..pos].trim()
+            } else {
+                trimmed
             };
             if !clean.is_empty() {
                 if first_non_comment_line.is_none() {
@@ -268,7 +266,7 @@ impl Registry {
         // compilation MUST fail.
         let has_content = src.lines().any(|line| {
             let trimmed = line.trim();
-            !trimmed.is_empty() && !trimmed.starts_with("//") && !trimmed.starts_with('#') && !trimmed.starts_with("registry ")
+            !trimmed.is_empty() && !trimmed.starts_with("//") && !trimmed.starts_with("registry ")
         });
         
         if has_content && entries.is_empty() {
@@ -309,12 +307,6 @@ impl Registry {
         Registry {
             entries: Vec::new(),
         }
-    }
-
-    /// Load registry from a single file
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, RegistryLoadError> {
-        let s = fs::read_to_string(path)?;
-        Self::parse(&s)
     }
 
     /// Get all registry entries (for merging)

@@ -1,0 +1,5 @@
+// AI3 NEGATIVE: `return` is a reserved keyword and cannot name a parameter
+// or a variable.
+fn n(return: Int) -> Int {
+  return return;
+}

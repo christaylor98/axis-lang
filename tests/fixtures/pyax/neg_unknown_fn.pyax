@@ -1,0 +1,4 @@
+# expect-error: is not defined: it is not a function in this file
+# a call to a name defined nowhere
+def main() -> None:
+    print(nothere(1))

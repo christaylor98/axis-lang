@@ -1,0 +1,7 @@
+# expect-error: ResultTypeMismatch { fn: `name`, declared: Int, body produces: [Text] }
+def name() -> int:
+    return "ada"
+
+
+def main(args: list[str]) -> int:
+    return name()

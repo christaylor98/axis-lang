@@ -3,7 +3,7 @@
 // This example demonstrates how to use the Wave 4 schema projection
 // to transform a Generic AST into a typed Schema AST.
 
-use axis_lang_lab::frontend::{
+use axis_lang::frontend::{
     ast_builder::build_generic_ast,
     parser_runtime::{ParseNode, ParseTree},
     schema_ast::{project_schema_ast, AstSchema, FieldExtraction, SchemaNodeDef, SpanRule},
@@ -107,7 +107,7 @@ fn main() {
     let mut schema = AstSchema {
         nodes: HashMap::new(),
         unhandled_behavior:
-            axis_lang_lab::frontend::schema_ast::UnhandledNodeBehavior::Reject,
+            axis_lang::frontend::schema_ast::UnhandledNodeBehavior::Reject,
     };
 
     // Define Atom node schema
@@ -164,7 +164,7 @@ fn main() {
     // Step 4: Access Semantic Fields
     // ═════════════════════════════════════════════════════════════════
 
-    use axis_lang_lab::frontend::schema_ast::SchemaValue;
+    use axis_lang::frontend::schema_ast::SchemaValue;
 
     println!("✓ Accessing semantic fields:");
 

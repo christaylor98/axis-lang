@@ -1,0 +1,6 @@
+# expect-exit: 3
+# a missing dict key aborts (KeyError)
+def main(args: list[str]) -> int:
+    d = {"a": 1}
+    print(d["a"])
+    return d["b"]

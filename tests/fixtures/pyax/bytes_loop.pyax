@@ -1,0 +1,27 @@
+# expect-exit: 0
+"""A Bytes value carried through loop state (value_to_bytes): chunks joined in a while loop, decoded once.
+Uses registry functions, so CPython can't run it; its .out is what the chunking must give back."""
+
+
+def chunks(s: str, n: int) -> list[str]:
+    out: list[str] = []
+    i = 0
+    while i < len(s):
+        out.append(s[i:i + n])
+        i += n
+    return out
+
+
+def main() -> None:
+    parts = chunks("héllo wörld, ünïcode ✓ in chunks", 3)
+    got = text_to_bytes("")
+    i = 0
+    while i < len(parts):
+        got = bytes_concat(got, text_to_bytes(parts[i]))
+        i += 1
+    print(bytes_len(got), bytes_to_text(got))
+    blobs = [text_to_bytes(p) for p in parts]
+    total = 0
+    for b in blobs:
+        total += bytes_len(b)
+    print(len(blobs), total)

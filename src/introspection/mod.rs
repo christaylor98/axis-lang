@@ -14,15 +14,13 @@
 // - Performance optimizations that affect semantics
 
 pub mod cli;
-pub mod code_trace;
-pub mod core_ir_json;
 pub mod inspection;
 pub mod inspector;
 pub mod provenance;
 pub mod trace_graph;
 pub mod trust; // Wave 6: Core IR JSON serialization
 
-pub use code_trace::{generate_code_trace, render_trace, CodeTraceError};
+// generate_code_trace / render_trace (legacy 0.3 Core IR path) removed in Phase 3d.
 pub use inspector::Inspector;
 pub use provenance::{ProvenanceAnnotation, ProvenanceNamespace};
 pub use trace_graph::{TraceGraph, TraceGraphBuilder, TraceLink, TraceNode};

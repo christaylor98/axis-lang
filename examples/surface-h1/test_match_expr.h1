@@ -1,10 +1,8 @@
 // Test: match expression construct
-// This tests: MatchExpr desugaring target
-// Expected: Parses successfully, fails NF validation
+// Expected: FAIL at NF validation (MatchExpr is in forbidden set)
 
 fn classify(x) {
   match x {
-    0 => 1,
-    _ => 2,
+    _ => Int(2),
   }
 }

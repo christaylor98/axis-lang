@@ -1,55 +1,35 @@
 nodes:
-  # Program: Decl*
   Program:
     fields:
-      decls:
-        from: children(0..)
+      decls: [Decl]
 
-  # Decl: Function | EnumDecl (union — pick child 0)
   Decl:
     union:
       - Function
       - EnumDecl
 
-  # Function: <KW_FN> <IDENT> <PUNCT_(> ParamList? <PUNCT_)> <PUNCT_->> Type Block
-  # child(0)=KW_FN  child(1)=IDENT  child(2)=PUNCT_(  [child(3)=ParamList?]
-  # child(-3)=PUNCT_)  child(-2)=Type  child(-1)=Block
   Function:
     fields:
-      name:
-        from: token(IDENT)
-      params:
-        from: children(3..)
-      return_type:
-        from: child(-2)
-      body:
-        from: child(-1)
+      name: Ident
+      params: [Param]
+      return_type: Type
+      body: Block
 
-  # Param: <IDENT> <PUNCT_:> Type
   Param:
     fields:
-      name:
-        from: token(IDENT)
-      type:
-        from: child(2)
+      name: Ident
+      type: Type
 
-  # Block: <PUNCT_{> Stmt* Expr <PUNCT_}>
   Block:
     fields:
-      statements:
-        from: children_excluding_last(1)
-      result:
-        from: child(-2)
+      statements: [LetStmt]
+      result: Expr
 
-  # LetStmt: <KW_LET> <IDENT> <PUNCT_=> Expr <PUNCT_;>
   LetStmt:
     fields:
-      name:
-        from: token(IDENT)
-      value:
-        from: child(3)
+      name: Ident
+      value: Expr
 
-  # Expr: union of alternatives
   Expr:
     union:
       - IfExpr
@@ -62,106 +42,11 @@ nodes:
       - IdentRef
       - Block
 
-  # IfExpr: <KW_IF> Expr Block <KW_ELSE> Block
-  IfExpr:
-    fields:
-      condition:
-        from: child(1)
-      then_branch:
-        from: child(2)
-      else_branch:
-        from: child(4)
-
-  # MatchExpr: <KW_MATCH> Expr <PUNCT_{> MatchArm+ <PUNCT_}>
-  MatchExpr:
-    fields:
-      scrutinee:
-        from: child(1)
-      arms:
-        from: children(3..)
-
-  # MatchArm: Pattern <PUNCT_=>> Expr <PUNCT_,>
-  MatchArm:
-    fields:
-      pattern:
-        from: child(0)
-      body:
-        from: child(2)
-
-  # ProjExpr: <KW_PROJ> <PUNCT_(> Expr <PUNCT_,> <INT> <PUNCT_)>
   ProjExpr:
     fields:
-      expr:
-        from: child(2)
-      index:
-        from: token(INT_LIT)
+      expr: Expr
+      index: int
 
-  # TupleExpr: <PUNCT_(> Expr (<PUNCT_,> Expr)+ <PUNCT_)>
   TupleExpr:
     fields:
-      items:
-        from: children(0..)
-
-  # CallExpr: <IDENT> <PUNCT_(> ArgList? <PUNCT_)>
-  CallExpr:
-    fields:
-      callee:
-        from: token(IDENT)
-      args:
-        from: children(2..)
-
-  # LambdaExpr: <PUNCT_|> <IDENT> <PUNCT_|> Expr
-  LambdaExpr:
-    fields:
-      param:
-        from: token(IDENT)
-      body:
-        from: child(3)
-
-  # EnumDecl: <KW_ENUM> <IDENT> <PUNCT_{> <IDENT>+ <PUNCT_}>
-  EnumDecl:
-    fields:
-      name:
-        from: token(IDENT)
-      variants:
-        from: tokens(IDENT)
-
-  # Pattern: <IDENT>
-  Pattern:
-    fields:
-      name:
-        from: token(IDENT)
-
-  # IdentRef: bare <IDENT> expression
-  IdentRef:
-    fields:
-      name:
-        from: token(IDENT)
-
-  # Literal: <INT> | <BOOL> | <STRING> | <UNIT>
-  Literal:
-    union:
-      - IntLit
-      - BoolLit
-      - StringLit
-      - UnitLit
-
-  IntLit:
-    fields:
-      value:
-        from: token(INT_LIT)
-
-  BoolLit:
-    fields:
-      value:
-        from: token(BOOL_LIT)
-
-  StringLit:
-    fields:
-      value:
-        from: token(STRING_LIT)
-
-  UnitLit:
-    fields:
-      _token:
-        from: token(UNIT_LIT)
+      items: [Expr]

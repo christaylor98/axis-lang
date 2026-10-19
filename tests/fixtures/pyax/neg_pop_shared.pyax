@@ -1,0 +1,5 @@
+# expect-error: can't be part of a larger expression here
+# the popped list is also read in the statement, so the pop can't move first
+def main() -> None:
+    xs = [1, 2, 3]
+    print(len(xs), xs.pop())

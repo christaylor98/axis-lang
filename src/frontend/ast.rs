@@ -45,6 +45,19 @@ pub enum Expr {
         then_block: Block,
         else_block: Block,
     },
+    /// Inline lambda expression (Phase 3b). Lowering lifts this to a
+    /// synthesised registry function; no Lam node survives into Core IR 0.5.
+    Lam {
+        params: Vec<Ident>,
+        body: Box<Expr>,
+    },
+    /// General function application (Phase 3b). When func is a Lam, lowering
+    /// lifts it; when func is a static Ident in scope, treated as a Call.
+    /// A func that is a runtime value (env-bound Ident) is Tier 3 → halt.
+    App {
+        func: Box<Expr>,
+        args: Vec<Expr>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]

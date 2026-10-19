@@ -1,0 +1,13 @@
+# expect-exit: 3
+# A raise inside a for loop (a fold) ends the loop and the run.
+def total(xs: list[int]) -> int:
+    t = 0
+    for x in xs:
+        if x < 0:
+            raise ValueError("negative: " + str(x))
+        t += x
+    return t
+
+
+def main() -> int:
+    return total([1, 2, -3] + list(range(1000000)))

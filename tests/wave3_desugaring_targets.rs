@@ -3,9 +3,9 @@
 // Tests that ForExpr, WhileExpr, MatchExpr are properly forbidden by NF validation
 // and that H1 wrapper nodes are admissible
 
-use axis_lang_lab::frontend::schema_ast::{SchemaAstNode, SchemaValue};
-use axis_lang_lab::frontend::token::Span;
-use axis_lang_lab::normalisation::validate_nf;
+use axis_lang::frontend::schema_ast::{SchemaAstNode, SchemaValue};
+use axis_lang::frontend::token::Span;
+use axis_lang::normalize::nf_validation::validate_nf;
 use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -131,7 +131,7 @@ fn test_h1_wrapper_nodes_are_admissible() {
     let h1_wrappers = vec![
         "Item",
         "FnDecl",
-        "LetStmt",
+        "AssignStmt",
         "BlockContent",
         "Stmt",
         "ExprStmt",

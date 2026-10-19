@@ -1,0 +1,8 @@
+// Matrix fixture: Body(n-binding) / nested lets
+// Two let-bindings fold to: LetExpr{x=a, body: LetExpr{y=b, body: VarRef(x)}}.
+// Shared by matrix rows: Body(n), nested lets.
+fn f(a: Bool, b: Bool) -> Bool {
+  let x = a
+  let y = b
+  x
+}

@@ -1,0 +1,6 @@
+# expect-error: neg_type_change.pyax:5:5:
+# expect-error: `x` holds int here, but this assigns str
+def main(args: list[str]) -> int:
+    x = 1
+    x = "one"
+    return 0

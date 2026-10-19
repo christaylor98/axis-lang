@@ -1,0 +1,10 @@
+// AI3 fixture: two top-level fns, the second calling the first.
+// run_pipeline splits multi-item files upstream, one bundle per declaration.
+fn double(n: Int) -> Int {
+  return int_mul(n, Int(2));
+}
+
+fn quadruple(n: Int) -> Int {
+  let once = double(n);
+  return double(once);
+}

@@ -1,4 +1,5 @@
-// AI2 Test 4: Application
-// H1 equivalent: f x
+// AI2 Test 4: Application — registered function applied to a literal argument.
+// var(name = f) resolves to the registry identity of fn f (SHA-256("f")).
+// The CApp chain is uncurried into a single CCall by the spec-driven lowerer.
 
-app(fn = var(name = f), arg = var(name = x))
+app(fn = var(name = f), arg = int(value = 42))

@@ -1,0 +1,6 @@
+# expect-error: neg_nested_def.pyax:4:9:
+# expect-error: a nested `def` is not in PyAx
+def f(x: int) -> int:
+    def g(y: int) -> int:
+        return y
+    return g(x)

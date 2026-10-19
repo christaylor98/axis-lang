@@ -1,0 +1,5 @@
+// Matrix fixture: ValueConstructExpr
+// Value type constructor with explicit type tags.
+fn make(a: Bool, b: Bool) -> Value(Bool, Bool) {
+  Value(Bool, Bool)(a, b)
+}

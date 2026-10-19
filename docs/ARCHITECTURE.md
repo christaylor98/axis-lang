@@ -1,8 +1,8 @@
-# Axis Language Lab — Architecture (Authoritative)
+# Axis Lang — Architecture (Authoritative)
 
 ## 1. Purpose and Scope
 
-**Axis Language Lab** is a compiler frontend whose sole responsibility is to transform **surface language source text** into **canonical Core IR**.
+**Axis Lang** is a compiler frontend whose sole responsibility is to transform **surface language source text** into **canonical Core IR**.
 
 Language Lab:
 
@@ -609,7 +609,7 @@ Future evolution must preserve:
 
 ### Final Summary
 
-> Axis Language Lab is a deterministic, data-driven compiler frontend that transforms surface languages into canonical Core IR 0.2 via:
+> Axis Lang is a deterministic, data-driven compiler frontend that transforms surface languages into canonical Core IR 0.2 via:
 > 
 > 1. **AST Projection** (surface-specific, schema-driven)
 > 2. **Normalization** (surface-agnostic, rewrite to NF, ONLY rewrite stage)

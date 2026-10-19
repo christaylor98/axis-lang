@@ -1,9 +1,9 @@
-> **Axis Language Lab — Compiler Hooks & Plugins Specification**
+> **Axis Lang — Compiler Hooks & Plugins Specification**
 > (Guidelines, v0.1)
 
 ---
 
-# Axis Language Lab — Compiler Hooks & Plugins Specification
+# Axis Lang — Compiler Hooks & Plugins Specification
 
 **Guidelines (v0.1)**
 
@@ -11,7 +11,7 @@
 
 ## 1. Purpose and Scope
 
-This document describes the **compiler hook and plugin model** exposed by **Axis Language Lab**.
+This document describes the **compiler hook and plugin model** exposed by **Axis Lang**.
 
 Compiler hooks provide **structured extension points** within the compilation pipeline, enabling experimentation, tooling, and adaptation **without changing program semantics**.
 

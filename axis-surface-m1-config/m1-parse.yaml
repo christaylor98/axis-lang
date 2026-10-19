@@ -1,0 +1,162 @@
+# M1 (Mechanical 1) Parser Specification
+# Surface: surface-m1
+# Version: 0.1
+#
+# Governed by: AXLANG_TYPE_SYSTEM_V2
+# Invariants: VALUELIST_TAG_MANDATORY, VALUE_RECEIVER_NOT_SENDER,
+#             NO_ALIAS_MECHANISM, NAMING_VIA_FUNCTIONS_ONLY
+#
+# Grammar design:
+# - Block-scoped: fn bodies contain let-bindings + final expression
+# - Type tags mandatory at Value/ValueList construction sites
+# - No lambda: fn-reference-by-name is the sole behaviour-passing mechanism
+# - No operators — all arithmetic is registry function calls
+# - No records, structs, Dict, alias, type variables
+
+parser:
+  start: Program
+
+  grammar:
+
+    # ── TOP LEVEL ────────────────────────────────────────────────
+
+    Program:
+      - Item*
+
+    Item:
+      - FnDecl
+      - LetDecl
+
+    # fn name(param: Type, ...) -> ReturnType { Body }
+    FnDecl:
+      - <KW_FN> <IDENT> <PUNCT_(> TypedParamList <PUNCT_)> <"PUNCT_->"> TypeExpr <PUNCT_{> Body <PUNCT_}>
+
+    # Top-level let declaration (for simple programs / REPL-style)
+    LetDecl:
+      - <KW_LET> <IDENT> <PUNCT_=> Expr
+
+    # ── TYPED PARAMETER LIST ─────────────────────────────────────
+
+    TypedParamList:
+      - TypedParam TypedParamRest*
+      - Empty
+
+    TypedParamRest:
+      - <PUNCT_,> TypedParam
+
+    TypedParam:
+      - <IDENT> <PUNCT_:> TypeExpr
+
+    # ── TYPE EXPRESSIONS ─────────────────────────────────────────
+    # These are surface-only tags. Core IR sees bare Value/ValueList.
+
+    TypeExpr:
+      - ValueTypeExpr       # Value(T1, T2, ...) — compound constructor tag
+      - ValueListTypeExpr   # ValueList(T) — list constructor tag
+      - PrimTypeExpr        # Int | Text | Bool | Unit | user-defined name
+
+    # Value(T1) | Value(T1, T2) | Value(T1, T2, T3)
+    # There is no limit on arity
+    ValueTypeExpr:
+      - <KW_VALUE> <PUNCT_(> TypeExpr TypeExprRest* <PUNCT_)>
+
+    TypeExprRest:
+      - <PUNCT_,> TypeExpr
+
+    # ValueList(T) — T must not be bare Value (enforced by validator)
+    ValueListTypeExpr:
+      - <KW_VALUELIST> <PUNCT_(> TypeExpr <PUNCT_)>
+
+    PrimTypeExpr:
+      - <KW_INT>
+      - <KW_TEXT>
+      - <KW_BOOL>
+      - <KW_UNIT>
+      - <KW_BYTES>
+      - <IDENT>
+
+    # ── BODY ─────────────────────────────────────────────────────
+    # Sequential let-bindings followed by a single return expression.
+    # Desugars to nested LetExpr in NF.
+
+    Body:
+      - LetBinding* Expr
+
+    LetBinding:
+      - <KW_LET> <IDENT> <PUNCT_=> Expr
+
+    # ── EXPRESSIONS ──────────────────────────────────────────────
+
+    Expr:
+      - DetermineExpr         # determinacy discharge gate (⊥-elimination)
+      - IfExpr
+      - ValueConstructExpr    # Value(T1, T2)(e1, e2) — mandatory tag
+      - ValueListConstructExpr # ValueList(T)(e1, e2, ...) — mandatory tag
+      - CallExpr              # name(args) — registry call
+      - IntLit                # Int(42)
+      - TextLit               # Text("hello")
+      - BoolLit               # Bool(true) | Bool(false)
+      - UnitLit               # Unit()
+      - <IDENT>               # variable reference
+
+    # determine — author-written discharge of ⊥; lowers to CDeterminate gate node.
+    # Must be written explicitly; the compiler never inserts this automatically.
+    DetermineExpr:
+      - <KW_DETERMINE>
+
+    # if cond { then_body } else { else_body }
+    # Branches are Body (LetBinding* Expr), not a bare Expr, so a branch may hold
+    # `let` bindings: `if c { let x = f(); g(x) } else { ... }`. A zero-binding
+    # branch `{ Expr }` is a Body whose bindings are empty and folds to the bare
+    # Expr in NF (fold_body_to_let_chain), so pre-existing single-Expr branches are
+    # byte-identical after normalization. Bottom-up normalization folds the branch
+    # Body → LetExpr chain BEFORE the IfExpr rule passes it through, and LetExpr
+    # lowering is env-scoped, so branch-local bindings stay scoped to the taken arm.
+    IfExpr:
+      - <KW_IF> Expr <PUNCT_{> Body <PUNCT_}> <KW_ELSE> <PUNCT_{> Body <PUNCT_}>
+
+    # ValueTypeArgs wraps the type-arg list so ValueConstructExpr has fixed child indices
+    ValueTypeArgs:
+      - TypeExpr TypeExprRest*
+
+    # Value(T1, T2)(e1, e2) — type tag mandatory at construction site
+    # Children: 0=KW_VALUE 1=PUNCT_( 2=ValueTypeArgs 3=PUNCT_) 4=PUNCT_( 5=ArgList 6=PUNCT_)
+    ValueConstructExpr:
+      - <KW_VALUE> <PUNCT_(> ValueTypeArgs <PUNCT_)> <PUNCT_(> ArgList <PUNCT_)>
+
+    # ValueList(T)(e1, e2, ...) or ValueList(T)[e1, e2, ...]
+    # ValueList(Value) is forbidden — enforced by validator
+    ValueListConstructExpr:
+      - <KW_VALUELIST> <PUNCT_(> TypeExpr <PUNCT_)> <PUNCT_(> ArgList <PUNCT_)>
+      - <KW_VALUELIST> <PUNCT_(> TypeExpr <PUNCT_)> <PUNCT_[> ArgList <PUNCT_]>
+
+    # name(arg, ...) — all function calls including HOFs and primitives
+    CallExpr:
+      - <IDENT> <PUNCT_(> ArgList <PUNCT_)>
+
+    ArgList:
+      - Expr ArgListRest*
+      - Empty
+
+    ArgListRest:
+      - <PUNCT_,> Expr
+
+    # ── LITERALS ─────────────────────────────────────────────────
+    # Typed constructor syntax. Constructors dissolve at lowering —
+    # the wrapper is surface discipline only; the IR sees a typed constant.
+
+    IntLit:
+      - <KW_INT> <PUNCT_(> <INT_LIT> <PUNCT_)>
+
+    TextLit:
+      - <KW_TEXT> <PUNCT_(> <STRING_LIT> <PUNCT_)>
+
+    BoolLit:
+      - <KW_BOOL> <PUNCT_(> <KW_TRUE> <PUNCT_)>
+      - <KW_BOOL> <PUNCT_(> <KW_FALSE> <PUNCT_)>
+
+    UnitLit:
+      - <KW_UNIT> <PUNCT_(> <PUNCT_)>
+
+    Empty:
+      -

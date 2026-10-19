@@ -1,0 +1,4 @@
+// Matrix fixture: LamExpr capturing outer variable (RULE 1 violation)
+// fn(a){x}: the lambda is in arg position (RULE 2 OK) but its body references
+// 'x' which is the FnDecl param, not the lambda's own param 'a'. Capture error.
+fn f(x: Bool) -> Unit { const_unit(fn(a) { x }) }

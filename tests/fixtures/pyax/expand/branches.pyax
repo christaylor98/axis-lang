@@ -1,0 +1,16 @@
+# Statement `if` that falls through, a name assigned on both branches,
+# operator dispatch, Python floor division.
+def grade(score: int) -> str:
+    if score >= 90:
+        label = "A"
+    elif score >= 75:
+        label = "B"
+    else:
+        label = "C"
+    print(label)
+    return label + str(score // 10)
+
+
+def main(args: list[str]) -> int:
+    print(grade(81))
+    return 0

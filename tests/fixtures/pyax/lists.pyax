@@ -1,0 +1,15 @@
+# expect-exit: 0
+# list literals, len, a registry fold with a def passed by name (list[int] is a
+# ValueList; the registry fold wants an IntList, so it is narrowed explicitly)
+def add(acc: int, x: int) -> int:
+    return acc + x
+
+
+def main(args: list[str]) -> int:
+    xs = [3, 1, 4, 1, 5, 9]
+    words: list[str] = []
+    print(str(len(xs)))
+    print(str(len(words)))
+    total: int = int_list_fold_int(value_list_to_int_list(xs), 0, add)
+    print(str(total))
+    return total

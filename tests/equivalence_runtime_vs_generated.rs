@@ -3,9 +3,9 @@
 // Source of truth: YAML spec file
 // Generated code: src/generated_lexer.rs
 
-use axis_lang_lab::frontend::lexer_engine::lex_with_spec;
-use axis_lang_lab::frontend::lexspec_load::load_spec;
-use axis_lang_lab::generated_lexer;
+use axis_lang::frontend::lexer_engine::lex_with_spec;
+use axis_lang::frontend::lexspec_load::load_spec;
+use axis_lang::generated_lexer;
 use std::path::PathBuf;
 
 const CANONICAL_SPEC: &str = "lang-lab-poc-userfiles/lexer.yaml";

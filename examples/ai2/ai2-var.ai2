@@ -1,4 +1,7 @@
-// AI2 Test 2: Variable reference
-// H1 equivalent: x
+// AI2 Test 2: Shared reference — let-bound value used in both if-branches.
+// Demonstrates flat-graph sharing: Pool(0) appears as both then- and else-ref
+// in the CIf node, proving the same pool entry can be referenced at multiple
+// positions without duplication.
 
-var(name = x)
+let(name = x, value = int(value = 42),
+  body = if(cond = bool(value = true), then = var(name = x), else = var(name = x)))

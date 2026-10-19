@@ -44,12 +44,12 @@ parser:
       - Stmt*
 
     Stmt:
-      - LetStmt
+      - AssignStmt
       - IntentDirectiveStmt
       - ExprStmt
 
-    LetStmt:
-      - <KW_LET> <IDENT> <PUNCT_=> Expr <PUNCT_;>
+    AssignStmt:
+      - <IDENT> <PUNCT_=> Expr <PUNCT_;>
 
     IntentDirectiveStmt:
       - IntentDirective Terminator
@@ -87,7 +87,6 @@ parser:
 
     Pattern:
       - <PUNCT__>
-      - Literal
       - IdentPat
       - CtorPat
 
@@ -183,15 +182,43 @@ parser:
     ArgListRest:
       - <PUNCT_,> Expr
 
+    IntLit:
+      - <KW_INT> <PUNCT_(> <INT_LIT> <PUNCT_)>
+
+    FloatLit:
+      - <KW_FLOAT> <PUNCT_(> <FLOAT_LIT> <PUNCT_)>
+
+    DecimalLit:
+      - <KW_DECIMAL> <PUNCT_(> <FLOAT_LIT> <PUNCT_)>
+
+    TextLit:
+      - <KW_TEXT> <PUNCT_(> <STRING_LIT> <PUNCT_)>
+
+    BoolLit:
+      - <KW_BOOL> <PUNCT_(> <KW_TRUE> <PUNCT_)>
+      - <KW_BOOL> <PUNCT_(> <KW_FALSE> <PUNCT_)>
+
+    UnitLit:
+      - <KW_UNIT> <PUNCT_(> <PUNCT_)>
+
+    ValueConstructExpr:
+      - <KW_VALUE> <PUNCT_(> ArgList <PUNCT_)>
+
+    ListConstructExpr:
+      - <KW_LIST> <PUNCT_(> ArgList <PUNCT_)>
+
     Primary:
-      - Literal
+      - IntLit
+      - FloatLit
+      - DecimalLit
+      - TextLit
+      - BoolLit
+      - UnitLit
+      - ValueConstructExpr
+      - ListConstructExpr
       - <IDENT>
       - Block
       - <PUNCT_(> Expr <PUNCT_)>
-
-    Literal:
-      - <INT_LIT>
-      - <STRING_LIT>
 
     Empty:
       - 

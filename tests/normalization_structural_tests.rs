@@ -13,11 +13,11 @@
 // These are STRUCTURAL tests, not semantic tests.
 // They verify the pipeline shape, not correctness of transformations.
 
-use axis_lang_lab::frontend::schema_ast::{SchemaAstNode, SchemaValue};
-use axis_lang_lab::frontend::token::{Span, Token, TokenKind};
-use axis_lang_lab::nf_ast::{NfAst, NfVersion};
-use axis_lang_lab::normalisation::nf_validation::validate_nf;
-use axis_lang_lab::normalize::{NormalizationContext, NormalizationError};
+use axis_lang::frontend::schema_ast::{SchemaAstNode, SchemaValue};
+use axis_lang::frontend::token::{Span, Token, TokenKind};
+use axis_lang::nf_ast::{NfAst, NfVersion};
+use axis_lang::normalize::nf_validation::validate_nf;
+use axis_lang::normalize::{NormalizationContext, NormalizationError};
 use std::collections::HashMap;
 use std::path::Path;
 

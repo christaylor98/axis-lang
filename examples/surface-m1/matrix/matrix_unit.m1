@@ -1,0 +1,4 @@
+// Matrix fixture: UnitLit constructor
+fn f() -> Unit {
+  Unit()
+}

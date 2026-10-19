@@ -1,13 +1,7 @@
-// Test 3: Conditional with let binding
-// This tests: IfExpr, LetStmt, variable reference
-// NOTE: Loop/intent tests are BLOCKED - Core IR 0.2 has no loop primitive
+// Test 3: Assignment + if/else
+// Expected: PASS
 
 fn main() {
-  let x = 1;
-  if x {
-    2
-  } else {
-    3
-  }
+  b = Bool(true);
+  if b { Int(2) } else { Int(3) }
 }
-

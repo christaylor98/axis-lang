@@ -1,0 +1,5 @@
+// Matrix fixture: ValueListConstructExpr
+// ValueList type constructor with mandatory type tag.
+fn make(a: Bool) -> ValueList(Bool) {
+  ValueList(Bool)(a)
+}

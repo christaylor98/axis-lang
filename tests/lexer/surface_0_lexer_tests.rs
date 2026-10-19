@@ -1,9 +1,9 @@
 // Surface-0 Lexer Tests - Verify spec compliance
 
-use axis_lang_lab::frontend::{lexer_engine, lexspec_load, token::TokenKind};
+use axis_lang::frontend::{lexer_engine, lexspec_load, token::TokenKind};
 use std::path::PathBuf;
 
-fn load_surface_0_spec() -> axis_lang_lab::frontend::lexspec::LexerSpec {
+fn load_surface_0_spec() -> axis_lang::frontend::lexspec::LexerSpec {
     lexspec_load::load_spec(&PathBuf::from("axis-surface-0-config/surface-0-lexer.yaml"))
         .expect("load surface-0 lexer spec")
 }

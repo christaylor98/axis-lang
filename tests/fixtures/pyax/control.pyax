@@ -1,0 +1,29 @@
+# expect-exit: 0
+# if/elif/else, early return, fall-through into the rest of the block,
+# a name assigned on every branch and used after the if
+def classify(n: int) -> str:
+    if n < 0:
+        return "negative"
+    elif n == 0:
+        return "zero"
+    elif n < 10:
+        kind = "small"
+    else:
+        kind = "large"
+    return kind + " positive"
+
+
+def report(n: int) -> None:
+    if n % 2 == 0:
+        print(str(n) + " is even")
+    print("checked " + str(n))
+
+
+def main(args: list[str]) -> int:
+    print(classify(-3))
+    print(classify(0))
+    print(classify(7))
+    print(classify(70))
+    report(4)
+    report(5)
+    return 0

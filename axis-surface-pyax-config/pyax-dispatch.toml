@@ -1,0 +1,36 @@
+# pyax-dispatch.toml — links pyax.axreg's callables to existing bridge runtime
+# functions. Pass to `axis-codegen-bridge build ... --dispatch <this file>`.
+
+[[fn]]
+name = "pyax_list_get"
+path = "axis_codegen_bridge::runtime::list::list_get"
+native_args = ["Value", "Int"]
+
+[[fn]]
+name = "pyax_text_list_widen"
+path = "axis_codegen_bridge::runtime::list::value_list_to_text_list"
+
+[[fn]]
+name = "pyax_int_list_widen"
+path = "axis_codegen_bridge::runtime::list::value_list_to_int_list"
+
+[[fn]]
+name = "pyax_bool_list_widen"
+path = "axis_codegen_bridge::runtime::list::value_list_to_bool_list"
+
+[[fn]]
+name = "pyax_list_reverse"
+path = "axis_codegen_bridge::runtime::list::list_reverse"
+
+[[fn]]
+name = "pyax_value_to_float"
+path = "axis_codegen_bridge::runtime::coerce::float_id"
+
+[[fn]]
+name = "pyax_value_to_dec"
+path = "axis_codegen_bridge::runtime::coerce::dec_id"
+
+[[fn]]
+name = "pyax_list_eq"
+path = "axis_codegen_bridge::runtime::arith::value_eq"
+native_args = ["Value", "Value"]

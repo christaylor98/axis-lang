@@ -1,6 +1,6 @@
-# Axis Language Lab User Guide
+# Axis Lang User Guide
 
-This guide explains how to use Axis Language Lab as a **language author**. You will learn how to design your own language, understand the role of each specification, and work within the architectural constraints of the system.
+This guide explains how to use Axis Lang as a **language author**. You will learn how to design your own language, understand the role of each specification, and work within the architectural constraints of the system.
 
 ---
 
@@ -17,7 +17,7 @@ This guide explains how to use Axis Language Lab as a **language author**. You w
 
 ## Core Concepts
 
-Axis Language Lab operates on a strict separation of concerns. Understanding these boundaries is essential.
+Axis Lang operates on a strict separation of concerns. Understanding these boundaries is essential.
 
 ### Lexer Specification
 
@@ -616,7 +616,7 @@ Execution is annotation-invariant. This is a verified property (see `tests/annot
 
 ## Introspection & Trust
 
-Axis Language Lab includes **provenance tracking**: you can inspect how Core IR was produced.
+Axis Lang includes **provenance tracking**: you can inspect how Core IR was produced.
 
 ---
 
@@ -840,7 +840,7 @@ You now understand:
 
 ### Writing Real Axis Code
 
-Axis Language Lab uses the Axis language to implement parts of itself (self-hosting).
+Axis Lang uses the Axis language to implement parts of itself (self-hosting).
 
 Example: The registry system can be extended by writing Axis code that defines new registry functions.
 
@@ -878,7 +878,7 @@ This is experimental but demonstrates the language's expressiveness.
 
 **These are deliberate:**
 
-Axis Language Lab focuses on semantic authority and lowering correctness, not production features.
+Axis Lang focuses on semantic authority and lowering correctness, not production features.
 
 **Workarounds:**
 
@@ -911,7 +911,7 @@ Determinism is a non-negotiable invariant.
 
 ### Community and Contribution
 
-Axis Language Lab is a working laboratory. Code is structured for clarity, not performance.
+Axis Lang is a working laboratory. Code is structured for clarity, not performance.
 
 **Contribution guidelines:**
 
@@ -927,7 +927,7 @@ See the repository's issue tracker for current work.
 ## Summary
 
 You are now equipped to:
-- Design and implement your own language using Axis Language Lab
+- Design and implement your own language using Axis Lang
 - Understand the role and boundaries of each pipeline stage
 - Use annotations responsibly as metadata, not semantics
 - Inspect provenance to verify correctness

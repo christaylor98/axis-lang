@@ -1,13 +1,19 @@
-// Wave S3: Lowering Spec Authority Integration Tests
+// Wave S3: CLI Error-Path Integration Tests
 //
-// OBJECTIVE: Verify that lowering spec is MANDATORY and enforced uniformly
-// across debug and release builds.
+// OBJECTIVE: Verify that the axis CLI hard-fails on bad inputs and that
+// all error exit paths are exercised under normal cargo test.
 //
-// HARD CONSTRAINTS:
-// - No fallback behavior
-// - Missing spec MUST hard-fail
-// - Invalid spec MUST hard-fail
-// - Debug and release MUST behave identically
+// COVERAGE:
+//   - Missing required flags (clap enforcement)
+//   - Non-existent spec/source/registry files
+//   - Unknown --inspect stage
+//   - axis verify: missing bundle path, missing --reg, unknown --effect-ceiling
+//   - axis bundle-id: missing argument, non-existent file, corrupt input
+//
+// NOTE: These tests were rewritten in Bundle 2 (2026-06-08).
+// The original tests targeted 'axis run --lowering' (retired CLI from main_old.rs).
+// They now target the current CLI: axis --lexer/--parser/--schema/--src/--reg
+// plus the axis verify and axis bundle-id subcommands.
 
 use std::fs;
 use std::path::PathBuf;
@@ -18,413 +24,286 @@ use std::process::Command;
 // ═══════════════════════════════════════════════════════════════════════════
 
 fn get_binary_path() -> PathBuf {
-    // Use debug binary by default, or release if CARGO_PROFILE=release
-    let profile = std::env::var("CARGO_PROFILE").unwrap_or_else(|_| "debug".to_string());
-    PathBuf::from(format!("target/{}/axis", profile))
+    // Prefer release binary (built by dev_build); fall back to debug.
+    let release = PathBuf::from("target/release/axis");
+    if release.exists() {
+        return release;
+    }
+    PathBuf::from("target/debug/axis")
 }
 
 fn ensure_binary_exists() -> PathBuf {
     let binary = get_binary_path();
-    if !binary.exists() {
-        panic!(
-            "Binary not found at {:?}. Run: cargo build{}",
-            binary,
-            if std::env::var("CARGO_PROFILE").is_ok() {
-                " --release"
-            } else {
-                ""
-            }
-        );
-    }
+    assert!(
+        binary.exists(),
+        "axis binary not found at {:?}. Run: cargo build --release",
+        binary
+    );
     binary
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TEST 1: Missing --lowering flag MUST fail
+// TEST 1: Missing required --reg flag MUST fail with clap error
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore] // Run with: cargo test --test wave_s3_spec_authority -- --ignored
-fn test_missing_lowering_flag_fails() {
+fn test_missing_required_reg_fails() {
     let binary = ensure_binary_exists();
 
     let output = Command::new(&binary)
-        .arg("run")
         .arg("--lexer")
-        .arg("axis-surface-0-config/semantic-surface-0-lexer.yaml")
+        .arg("axis-surface-ai2-config/ai2-explicit-lexer.yaml")
         .arg("--parser")
-        .arg("axis-surface-0-config/semantic-surface-0-parse.yaml")
+        .arg("axis-surface-ai2-config/ai2-explicit-parse.yaml")
         .arg("--schema")
-        .arg("axis-surface-0-config/semantic-surface-0-ast.yaml")
-        .arg("--file")
-        .arg("examples/surface-0/semantic-s0-test.ax0")
-        // NOTE: --lowering flag OMITTED
+        .arg("axis-surface-ai2-config/ai2-explicit-ast.yaml")
+        .arg("--src")
+        .arg("examples/hello.ax")
+        // NOTE: --reg flag OMITTED — clap should hard-fail
         .output()
         .expect("failed to execute binary");
 
-    // MUST fail (non-zero exit code)
     assert!(
         !output.status.success(),
-        "Expected failure when --lowering flag omitted, but command succeeded"
+        "Expected failure when --reg is omitted, but command succeeded"
     );
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-
-    // MUST mention missing required argument
     assert!(
-        stderr.contains("required") || stderr.contains("lowering"),
-        "Error message should mention missing required --lowering flag. Got: {}",
+        stderr.contains("required") || stderr.contains("reg") || stderr.contains("error"),
+        "Expected error message mentioning missing required flag. Got: {}",
         stderr
     );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TEST 2: Non-existent lowering spec file MUST fail with spec-load error
+// TEST 2: Non-existent --lexer file MUST fail with spec-not-found error
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore] // Run with: cargo test --test wave_s3_spec_authority -- --ignored
-fn test_missing_spec_file_fails() {
+fn test_missing_lexer_file_fails() {
     let binary = ensure_binary_exists();
 
     let output = Command::new(&binary)
-        .arg("run")
         .arg("--lexer")
-        .arg("axis-surface-0-config/semantic-surface-0-lexer.yaml")
+        .arg("no-such-lexer.yaml")
         .arg("--parser")
-        .arg("axis-surface-0-config/semantic-surface-0-parse.yaml")
+        .arg("axis-surface-ai2-config/ai2-explicit-parse.yaml")
         .arg("--schema")
-        .arg("axis-surface-0-config/semantic-surface-0-ast.yaml")
-        .arg("--lowering")
-        .arg("non-existent-spec.yaml") // File does not exist
+        .arg("axis-surface-ai2-config/ai2-explicit-ast.yaml")
+        .arg("--normalize")
+        .arg("axis-surface-ai2-config/ai2-explicit-normalize.yaml")
         .arg("--file")
-        .arg("examples/surface-0/semantic-s0-test.ax0")
+        .arg("examples/surface-m1/fn_identity.m1")
+        .arg("--reg")
+        .arg("registries/axis.axreg")
         .output()
         .expect("failed to execute binary");
 
-    // MUST fail
     assert!(
         !output.status.success(),
-        "Expected failure when lowering spec file missing, but command succeeded"
+        "Expected failure when --lexer file missing, but command succeeded"
     );
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-
-    // MUST mention file not found
     assert!(
-        stderr.contains("not found") || stderr.contains("No such file"),
-        "Error message should mention file not found. Got: {}",
+        stderr.contains("not found") || stderr.contains("Lexer"),
+        "Expected error message mentioning missing lexer. Got: {}",
         stderr
     );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TEST 3: Invalid lowering spec (bad YAML) MUST fail with parse error
+// TEST 3: Non-existent --src file MUST fail
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore] // Run with: cargo test --test wave_s3_spec_authority -- --ignored
-fn test_invalid_yaml_spec_fails() {
+fn test_missing_source_file_fails() {
     let binary = ensure_binary_exists();
 
-    // Create invalid YAML spec
-    let bad_spec_path = PathBuf::from("target/test_invalid_spec.yaml");
-    fs::write(&bad_spec_path, "this is not valid yaml: ][}{").unwrap();
-
     let output = Command::new(&binary)
-        .arg("run")
         .arg("--lexer")
-        .arg("axis-surface-0-config/semantic-surface-0-lexer.yaml")
+        .arg("axis-surface-ai2-config/ai2-explicit-lexer.yaml")
         .arg("--parser")
-        .arg("axis-surface-0-config/semantic-surface-0-parse.yaml")
+        .arg("axis-surface-ai2-config/ai2-explicit-parse.yaml")
         .arg("--schema")
-        .arg("axis-surface-0-config/semantic-surface-0-ast.yaml")
-        .arg("--lowering")
-        .arg(&bad_spec_path)
+        .arg("axis-surface-ai2-config/ai2-explicit-ast.yaml")
+        .arg("--normalize")
+        .arg("axis-surface-ai2-config/ai2-explicit-normalize.yaml")
         .arg("--file")
-        .arg("examples/surface-0/semantic-s0-test.ax0")
+        .arg("no-such-source-file.ax") // Does not exist
+        .arg("--reg")
+        .arg("registries/axis.axreg")
         .output()
         .expect("failed to execute binary");
 
-    // Cleanup
-    let _ = fs::remove_file(&bad_spec_path);
-
-    // MUST fail
     assert!(
         !output.status.success(),
-        "Expected failure when lowering spec has invalid YAML, but command succeeded"
-    );
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    // MUST mention parse error
-    assert!(
-        stderr.contains("parse") || stderr.contains("invalid"),
-        "Error message should mention parse failure. Got: {}",
-        stderr
+        "Expected failure when --src file missing, but command succeeded"
     );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TEST 4: Invalid lowering spec (wrong version) MUST fail with validation error
+// TEST 4: Unknown --inspect stage MUST fail with a clear error
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore] // Run with: cargo test --test wave_s3_spec_authority -- --ignored
-fn test_wrong_version_spec_fails() {
-    let binary = ensure_binary_exists();
-
-    // Create spec with wrong version
-    let bad_spec_content = r#"
-version: "99.0"
-target_ir: "0.2"
-rules: {}
-"#;
-    let bad_spec_path = PathBuf::from("target/test_wrong_version_spec.yaml");
-    fs::write(&bad_spec_path, bad_spec_content).unwrap();
-
-    let output = Command::new(&binary)
-        .arg("run")
-        .arg("--lexer")
-        .arg("axis-surface-0-config/semantic-surface-0-lexer.yaml")
-        .arg("--parser")
-        .arg("axis-surface-0-config/semantic-surface-0-parse.yaml")
-        .arg("--schema")
-        .arg("axis-surface-0-config/semantic-surface-0-ast.yaml")
-        .arg("--lowering")
-        .arg(&bad_spec_path)
-        .arg("--file")
-        .arg("examples/surface-0/semantic-s0-test.ax0")
-        .output()
-        .expect("failed to execute binary");
-
-    // Cleanup
-    let _ = fs::remove_file(&bad_spec_path);
-
-    // MUST fail
-    assert!(
-        !output.status.success(),
-        "Expected failure when lowering spec has wrong version, but command succeeded"
-    );
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    // MUST mention version mismatch
-    assert!(
-        stderr.contains("version") || stderr.contains("unsupported"),
-        "Error message should mention version mismatch. Got: {}",
-        stderr
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TEST 5: Invalid lowering spec (wrong target IR) MUST fail
-// ═══════════════════════════════════════════════════════════════════════════
-
-#[test]
-#[ignore] // Run with: cargo test --test wave_s3_spec_authority -- --ignored
-fn test_wrong_target_ir_spec_fails() {
-    let binary = ensure_binary_exists();
-
-    // Create spec with wrong target IR
-    let bad_spec_content = r#"
-version: "0.1"
-target_ir: "99.0"
-rules: {}
-"#;
-    let bad_spec_path = PathBuf::from("target/test_wrong_ir_spec.yaml");
-    fs::write(&bad_spec_path, bad_spec_content).unwrap();
-
-    let output = Command::new(&binary)
-        .arg("run")
-        .arg("--lexer")
-        .arg("axis-surface-0-config/semantic-surface-0-lexer.yaml")
-        .arg("--parser")
-        .arg("axis-surface-0-config/semantic-surface-0-parse.yaml")
-        .arg("--schema")
-        .arg("axis-surface-0-config/semantic-surface-0-ast.yaml")
-        .arg("--lowering")
-        .arg(&bad_spec_path)
-        .arg("--file")
-        .arg("examples/surface-0/semantic-s0-test.ax0")
-        .output()
-        .expect("failed to execute binary");
-
-    // Cleanup
-    let _ = fs::remove_file(&bad_spec_path);
-
-    // MUST fail
-    assert!(
-        !output.status.success(),
-        "Expected failure when lowering spec has wrong target IR, but command succeeded"
-    );
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    // MUST mention IR version mismatch
-    assert!(
-        stderr.contains("target IR")
-            || stderr.contains("IR version")
-            || stderr.contains("unsupported"),
-        "Error message should mention target IR mismatch. Got: {}",
-        stderr
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TEST 6: Empty lowering spec (no rules) MUST fail
-// ═══════════════════════════════════════════════════════════════════════════
-
-#[test]
-#[ignore] // Run with: cargo test --test wave_s3_spec_authority -- --ignored
-fn test_empty_spec_fails() {
-    let binary = ensure_binary_exists();
-
-    // Create spec with no rules
-    let bad_spec_content = r#"
-version: "0.1"
-target_ir: "0.2"
-rules: {}
-"#;
-    let bad_spec_path = PathBuf::from("target/test_empty_spec.yaml");
-    fs::write(&bad_spec_path, bad_spec_content).unwrap();
-
-    let output = Command::new(&binary)
-        .arg("run")
-        .arg("--lexer")
-        .arg("axis-surface-0-config/semantic-surface-0-lexer.yaml")
-        .arg("--parser")
-        .arg("axis-surface-0-config/semantic-surface-0-parse.yaml")
-        .arg("--schema")
-        .arg("axis-surface-0-config/semantic-surface-0-ast.yaml")
-        .arg("--lowering")
-        .arg(&bad_spec_path)
-        .arg("--file")
-        .arg("examples/surface-0/semantic-s0-test.ax0")
-        .output()
-        .expect("failed to execute binary");
-
-    // Cleanup
-    let _ = fs::remove_file(&bad_spec_path);
-
-    // MUST fail
-    assert!(
-        !output.status.success(),
-        "Expected failure when lowering spec has no rules, but command succeeded"
-    );
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-
-    // MUST mention empty or no rules
-    assert!(
-        stderr.contains("no rules") || stderr.contains("empty"),
-        "Error message should mention empty spec. Got: {}",
-        stderr
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TEST 7: Valid spec with --inspect lowering MUST show spec metadata
-// ═══════════════════════════════════════════════════════════════════════════
-
-#[test]
-#[ignore] // Run with: cargo test --test wave_s3_spec_authority -- --ignored
-fn test_inspect_lowering_shows_spec_metadata() {
+fn test_unknown_inspect_stage_fails() {
     let binary = ensure_binary_exists();
 
     let output = Command::new(&binary)
-        .arg("run")
         .arg("--lexer")
-        .arg("axis-surface-0-config/semantic-surface-0-lexer.yaml")
+        .arg("axis-surface-ai2-config/ai2-explicit-lexer.yaml")
         .arg("--parser")
-        .arg("axis-surface-0-config/semantic-surface-0-parse.yaml")
+        .arg("axis-surface-ai2-config/ai2-explicit-parse.yaml")
         .arg("--schema")
-        .arg("axis-surface-0-config/semantic-surface-0-ast.yaml")
-        .arg("--lowering")
-        .arg("axis-surface-0-config/semantic-surface-0-lowering.yaml")
+        .arg("axis-surface-ai2-config/ai2-explicit-ast.yaml")
+        .arg("--normalize")
+        .arg("axis-surface-ai2-config/ai2-explicit-normalize.yaml")
         .arg("--file")
-        .arg("examples/surface-0/semantic-s0-test.ax0")
+        .arg("tests/samples/simple.ax") // examples/hello.ax does not exist; this does
+        .arg("--reg")
+        .arg("registries/minimal.axreg")
         .arg("--inspect")
-        .arg("lowering")
+        .arg("nonexistent-stage-xyz")
         .output()
         .expect("failed to execute binary");
 
-    // MUST succeed
     assert!(
-        output.status.success(),
-        "Expected success with valid spec and --inspect lowering. Stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
+        !output.status.success(),
+        "Expected failure for unknown --inspect stage, but command succeeded"
     );
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // MUST show spec metadata
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stdout.contains("LOWERING SPEC INSPECTION") || stdout.contains("content_hash"),
-        "Expected lowering spec inspection output with metadata. Got: {}",
-        stdout
+        stderr.contains("Unknown inspect stage") || stderr.contains("nonexistent-stage-xyz"),
+        "Expected error message about unknown inspect stage. Got: {}",
+        stderr
     );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// TEST 8: Valid spec MUST lower deterministically
+// TEST 5: axis verify with no bundle path MUST fail with usage message
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore] // Run with: cargo test --test wave_s3_spec_authority -- --ignored
-fn test_valid_spec_lowers_deterministically() {
+fn test_verify_no_bundle_path_fails() {
     let binary = ensure_binary_exists();
 
-    // Run twice with same inputs
-    let output1 = Command::new(&binary)
-        .arg("run")
-        .arg("--lexer")
-        .arg("axis-surface-0-config/semantic-surface-0-lexer.yaml")
-        .arg("--parser")
-        .arg("axis-surface-0-config/semantic-surface-0-parse.yaml")
-        .arg("--schema")
-        .arg("axis-surface-0-config/semantic-surface-0-ast.yaml")
-        .arg("--lowering")
-        .arg("axis-surface-0-config/semantic-surface-0-lowering.yaml")
-        .arg("--file")
-        .arg("examples/surface-0/semantic-s0-test.ax0")
-        .arg("--inspect")
-        .arg("core-ir")
+    let output = Command::new(&binary)
+        .arg("verify")
+        // No bundle path provided
+        .arg("--reg")
+        .arg("registries/axis.axreg")
         .output()
         .expect("failed to execute binary");
 
-    let output2 = Command::new(&binary)
-        .arg("run")
-        .arg("--lexer")
-        .arg("axis-surface-0-config/semantic-surface-0-lexer.yaml")
-        .arg("--parser")
-        .arg("axis-surface-0-config/semantic-surface-0-parse.yaml")
-        .arg("--schema")
-        .arg("axis-surface-0-config/semantic-surface-0-ast.yaml")
-        .arg("--lowering")
-        .arg("axis-surface-0-config/semantic-surface-0-lowering.yaml")
-        .arg("--file")
-        .arg("examples/surface-0/semantic-s0-test.ax0")
-        .arg("--inspect")
-        .arg("core-ir")
+    assert!(
+        !output.status.success(),
+        "Expected failure when no bundle path given to verify, but command succeeded"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("usage") || stderr.contains("verify"),
+        "Expected usage hint in error. Got: {}",
+        stderr
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEST 6: axis verify with no --reg MUST fail
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_verify_no_reg_fails() {
+    let binary = ensure_binary_exists();
+
+    // Write a dummy file so the path check passes
+    let dummy = PathBuf::from("target/test_s3_dummy.coreir");
+    fs::write(&dummy, b"not real axbi data").unwrap();
+
+    let output = Command::new(&binary)
+        .arg("verify")
+        .arg(&dummy)
+        // No --reg provided
         .output()
         .expect("failed to execute binary");
 
-    // Both MUST succeed
+    let _ = fs::remove_file(&dummy);
+
     assert!(
-        output1.status.success(),
-        "First run failed. Stderr: {}",
-        String::from_utf8_lossy(&output1.stderr)
-    );
-    assert!(
-        output2.status.success(),
-        "Second run failed. Stderr: {}",
-        String::from_utf8_lossy(&output2.stderr)
+        !output.status.success(),
+        "Expected failure when --reg omitted from verify, but command succeeded"
     );
 
-    // Outputs MUST be identical
-    assert_eq!(
-        output1.stdout, output2.stdout,
-        "Lowering is not deterministic: outputs differ between runs"
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--reg") || stderr.contains("required"),
+        "Expected error mentioning missing --reg. Got: {}",
+        stderr
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEST 7: axis verify with unknown --effect-ceiling MUST fail
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_verify_unknown_effect_ceiling_fails() {
+    let binary = ensure_binary_exists();
+
+    let dummy = PathBuf::from("target/test_s3_ceiling.coreir");
+    fs::write(&dummy, b"not real axbi data").unwrap();
+
+    let output = Command::new(&binary)
+        .arg("verify")
+        .arg(&dummy)
+        .arg("--reg")
+        .arg("registries/axis.axreg")
+        .arg("--effect-ceiling")
+        .arg("impossible-level")
+        .output()
+        .expect("failed to execute binary");
+
+    let _ = fs::remove_file(&dummy);
+
+    assert!(
+        !output.status.success(),
+        "Expected failure for unknown --effect-ceiling, but command succeeded"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("impossible-level") || stderr.contains("effect ceiling") || stderr.contains("unknown"),
+        "Expected error mentioning bad effect ceiling. Got: {}",
+        stderr
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TEST 8: axis bundle-id with no argument MUST fail with usage message
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_bundle_id_no_argument_fails() {
+    let binary = ensure_binary_exists();
+
+    let output = Command::new(&binary)
+        .arg("bundle-id")
+        // No path argument
+        .output()
+        .expect("failed to execute binary");
+
+    assert!(
+        !output.status.success(),
+        "Expected failure when no argument given to bundle-id, but command succeeded"
+    );
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("usage") || stderr.contains("bundle-id"),
+        "Expected usage hint in error. Got: {}",
+        stderr
     );
 }

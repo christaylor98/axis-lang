@@ -1,5 +1,5 @@
-registry minimal 0.1
+// Phase 5: placeholder retired — use registries/axis.axreg for compiler primitives.
+// This file is kept for backward compatibility with test invocations that pass
+// --reg registries/minimal.axreg; it loads as an empty scope (no functions defined).
 
-# Minimal Registry
-# Empty registry for basic compilation
-# No external operators required
+registry minimal 0.5

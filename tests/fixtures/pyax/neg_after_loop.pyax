@@ -1,0 +1,7 @@
+# expect-error: is first assigned inside a loop
+# a name first assigned in a loop body, read after the loop
+def main() -> None:
+    for x in [1, 2, 3]:
+        last = x
+    y = last + 1
+    print(y)

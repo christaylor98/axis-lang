@@ -13,7 +13,6 @@ lexer:
       skip: true
 
   keywords:
-    - let
     - fn
     - if
     - else
@@ -31,6 +30,17 @@ lexer:
     - on
     - run
     - intent
+    - true
+    - false
+    - unit
+    - Int
+    - Text
+    - Bool
+    - Unit
+    - Float
+    - Decimal
+    - Value
+    - List
 
   identifiers:
     pattern: "[A-Za-z_][A-Za-z0-9_]*"
@@ -42,6 +52,8 @@ lexer:
     int:
       pattern: "[0-9]+"
       base: 10
+    float:
+      pattern: "[0-9]+\\.[0-9]+"
     string:
       delimiter: "\""
       escapes: ["\\\"", "\\\\", "\\n", "\\t", "\\r"]

@@ -1,0 +1,9 @@
+# expect-error: neg_alias_param.pyax:4:5:
+# expect-error: `xs` is a parameter: updating it would change the caller's value
+def add_one(xs: list[int]) -> list[int]:
+    xs.append(1)
+    return xs
+
+
+def main(args: list[str]) -> int:
+    return len(add_one([1, 2]))

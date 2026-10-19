@@ -1,0 +1,58 @@
+// M1 — Mechanical 1
+// Example: compound Value construction, accessors, and HOFs
+// Governed by: AXLANG_TYPE_SYSTEM_V2
+
+// ── User shape — named via constructor and accessor functions ──────────────
+// No alias, no struct. Naming lives in function names. (NAMING_VIA_FUNCTIONS_ONLY)
+
+fn make_user(name: Text, age: Int) -> Value(Text, Int) {
+  Value(Text, Int)(name, age)
+}
+
+fn user_name(u: Value(Text, Int)) -> Text {
+  value_0(u)
+}
+
+fn user_age(u: Value(Text, Int)) -> Int {
+  value_1(u)
+}
+
+// ── Basic usage ──────────────────────────────────────────────────────────
+
+fn example_basic() -> Text {
+  let u = make_user(Text("Alice"), Int(30))
+  user_name(u)
+}
+
+// ── ValueList with mandatory type tag ────────────────────────────────────
+// ValueList(Value) is forbidden. ValueList(Text) is the correct form.
+
+fn example_sort() -> ValueList(Text) {
+  let names = ValueList(Text)(Text("Charlie"), Text("Alice"), Text("Bob"))
+  sort(names, fn(a, b) { text_lt(a, b) })
+}
+
+// ── HOF: map over a list of compound Values ───────────────────────────────
+// AI knows elements are Value(Text, Int). Lambda accesses slot 0.
+
+fn example_map_names(users: ValueList(Value(Text, Int))) -> ValueList(Text) {
+  map(users, fn(u) { value_0(u) })
+}
+
+// ── HOF: filter ───────────────────────────────────────────────────────────
+
+fn example_adults(users: ValueList(Value(Text, Int))) -> ValueList(Value(Text, Int)) {
+  filter(users, fn(u) { int_gt(value_1(u), Int(18)) })
+}
+
+// ── HOF: reduce ───────────────────────────────────────────────────────────
+
+fn example_total_age(users: ValueList(Value(Text, Int))) -> Int {
+  reduce(users, fn(acc, u) { int_add(acc, value_1(u)) }, Int(0))
+}
+
+// ── If expression ─────────────────────────────────────────────────────────
+
+fn classify_age(age: Int) -> Text {
+  if int_gt(age, Int(18)) { Text("adult") } else { Text("minor") }
+}

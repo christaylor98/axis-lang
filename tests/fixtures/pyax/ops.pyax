@@ -1,0 +1,28 @@
+# expect-exit: 0
+# operators: Python floor semantics for // and %, chains, bool ops, unary minus
+def show(label: str, v: int) -> None:
+    print(label + " " + str(v))
+
+
+def main(args: list[str]) -> int:
+    show("7//2", 7 // 2)
+    show("-7//2", -7 // 2)
+    show("7//-2", 7 // -2)
+    show("-7//-2", -7 // -2)
+    show("7%3", 7 % 3)
+    show("-7%3", -7 % 3)
+    show("7%-3", 7 % -3)
+    show("-x", -(3 + 4))
+    a = 5
+    b = 10
+    print(str(1 < a < b))
+    print(str(a < b < 3))
+    print(str(a == 5 and not b == 5))
+    print(str(a != 5 or b >= 10))
+    print("ab" * 3)
+    print(str(len("hello")))
+    print(str(int("42") + 1))
+    print(str("ell" in "hello"))
+    print(str("z" not in "hello"))
+    c = a if a > b else b
+    return c * 2 + 1

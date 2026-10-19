@@ -1,9 +1,9 @@
 // Surface-H1 Lexer Tests - Verify spec compliance
 
-use axis_lang_lab::frontend::{lexer_engine, lexspec_load, token::TokenKind};
+use axis_lang::frontend::{lexer_engine, lexspec_load, token::TokenKind};
 use std::path::PathBuf;
 
-fn load_h1_spec() -> axis_lang_lab::frontend::lexspec::LexerSpec {
+fn load_h1_spec() -> axis_lang::frontend::lexspec::LexerSpec {
     lexspec_load::load_spec(&PathBuf::from(
         "axis-surface-h1-config/surface-h1-lexer.yaml",
     ))
@@ -13,16 +13,36 @@ fn load_h1_spec() -> axis_lang_lab::frontend::lexspec::LexerSpec {
 #[test]
 fn h1_lex_keywords() {
     let spec = load_h1_spec();
-    let src = "let fn if else loop while for in match spawn";
+    // H1 has no `let`; type constructors are keywords; true/false/unit are keywords.
+    let src = "fn if else Int Text Bool Unit Value List true false unit";
     let tokens = lexer_engine::lex_with_spec(&spec, src).expect("lex failed");
 
-    // 10 keywords + EOF
-    assert_eq!(tokens.len(), 11);
-    assert!(matches!(tokens[0].kind, TokenKind::Keyword(ref k) if k == "let"));
-    assert!(matches!(tokens[1].kind, TokenKind::Keyword(ref k) if k == "fn"));
-    assert!(matches!(tokens[2].kind, TokenKind::Keyword(ref k) if k == "if"));
-    assert!(matches!(tokens[3].kind, TokenKind::Keyword(ref k) if k == "else"));
-    assert!(matches!(tokens[4].kind, TokenKind::Keyword(ref k) if k == "loop"));
+    // 12 keywords + EOF
+    assert_eq!(tokens.len(), 13);
+    assert!(matches!(tokens[0].kind, TokenKind::Keyword(ref k) if k == "fn"));
+    assert!(matches!(tokens[1].kind, TokenKind::Keyword(ref k) if k == "if"));
+    assert!(matches!(tokens[2].kind, TokenKind::Keyword(ref k) if k == "else"));
+    assert!(matches!(tokens[3].kind, TokenKind::Keyword(ref k) if k == "Int"));
+    assert!(matches!(tokens[4].kind, TokenKind::Keyword(ref k) if k == "Text"));
+    assert!(matches!(tokens[5].kind, TokenKind::Keyword(ref k) if k == "Bool"));
+    assert!(matches!(tokens[6].kind, TokenKind::Keyword(ref k) if k == "Unit"));
+    assert!(matches!(tokens[7].kind, TokenKind::Keyword(ref k) if k == "Value"));
+    assert!(matches!(tokens[8].kind, TokenKind::Keyword(ref k) if k == "List"));
+    assert!(matches!(tokens[9].kind, TokenKind::Keyword(ref k) if k == "true"));
+    assert!(matches!(tokens[10].kind, TokenKind::Keyword(ref k) if k == "false"));
+    assert!(matches!(tokens[11].kind, TokenKind::Keyword(ref k) if k == "unit"));
+}
+
+#[test]
+fn h1_lex_let_is_identifier() {
+    let spec = load_h1_spec();
+    // `let` was removed from keywords; it now lexes as an identifier
+    let src = "let";
+    let tokens = lexer_engine::lex_with_spec(&spec, src).expect("lex failed");
+
+    assert_eq!(tokens.len(), 2); // let (ident) + EOF
+    assert!(matches!(tokens[0].kind, TokenKind::Ident));
+    assert_eq!(tokens[0].lexeme, "let");
 }
 
 #[test]

@@ -1,0 +1,5 @@
+# expect-exit: 4
+# 1 << 63 does not fit a 64-bit int: an overflow stops the program (a defect, like int_mul's), never a silent wrap.
+def main() -> None:
+    n = 63
+    print(1 << n)

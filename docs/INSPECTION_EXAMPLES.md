@@ -1,6 +1,6 @@
 # Pipeline Inspection Examples
 
-This document demonstrates the full observability capabilities of Axis Language Lab.
+This document demonstrates the full observability capabilities of Axis Lang.
 
 ## Quick Examples
 

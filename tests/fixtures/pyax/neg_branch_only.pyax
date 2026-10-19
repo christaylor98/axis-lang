@@ -1,0 +1,6 @@
+# expect-error: is assigned in only some branches
+# a name assigned in one branch of an if, read after it
+def main(args: list[str]) -> None:
+    if len(args) > 0:
+        s = "some"
+    print(s)

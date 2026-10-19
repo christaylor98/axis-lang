@@ -1,6 +1,8 @@
-// Minimal test for ForExpr projection
-// Run with --inspect ast to verify ForExpr appears
+// Minimal for loop fixture inside a function
+// Expected: FAIL at NF validation (ForExpr is in forbidden set)
 
-for x in y {
-  x
+fn minimal() {
+  for x in y {
+    x
+  }
 }

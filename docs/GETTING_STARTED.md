@@ -1,4 +1,4 @@
-# Getting Started with Axis Language Lab
+# Getting Started with Axis Lang
 
 This guide walks you through compiling your first Axis program end-to-end. By the end, you will have run the complete pipeline from source code to Core IR emission.
 
@@ -26,8 +26,8 @@ Running examples: ~2 minutes
 
 ```bash
 # Clone the repository
-git clone https://github.com/christaylor98/axis-lang-lab-working.git
-cd axis-lang-lab-working
+git clone https://github.com/christaylor98/axis-lang.git
+cd axis-lang
 
 # Build the compiler
 cargo build --release

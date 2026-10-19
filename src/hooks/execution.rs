@@ -123,27 +123,6 @@ impl HookExecutionTrace {
         self.executions.push(execution);
     }
 
-    /// Get executions for a specific stage
-    pub fn get_stage_executions(&self, stage: HookStage) -> Vec<&HookExecution> {
-        self.executions
-            .iter()
-            .filter(|e| e.stage == format!("{}", stage))
-            .collect()
-    }
-
-    /// Check if any hooks failed
-    pub fn has_failures(&self) -> bool {
-        self.failures > 0
-    }
-
-    /// Get all failed hook names
-    pub fn failed_hooks(&self) -> Vec<String> {
-        self.executions
-            .iter()
-            .filter(|e| e.error.is_some())
-            .map(|e| e.hook_name.clone())
-            .collect()
-    }
 }
 
 impl Default for HookExecutionTrace {
@@ -267,68 +246,3 @@ impl HookExecutor {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// INSPECTION FORMATTING
-// ═══════════════════════════════════════════════════════════════════════════
-
-impl HookExecutionTrace {
-    /// Format trace for inspection output
-    pub fn format_for_inspection(&self) -> String {
-        let mut output = String::new();
-
-        output.push_str(
-            "═══════════════════════════════════════════════════════════════════════════\n",
-        );
-        output.push_str("HOOK EXECUTION TRACE\n");
-        output.push_str(
-            "═══════════════════════════════════════════════════════════════════════════\n\n",
-        );
-
-        if self.executions.is_empty() {
-            output.push_str("No hooks executed.\n");
-            return output;
-        }
-
-        output.push_str(&format!("Total Hooks: {}\n", self.executions.len()));
-        output.push_str(&format!("Modifications: {}\n", self.modifications));
-        output.push_str(&format!("Failures: {}\n", self.failures));
-        output.push_str(&format!("Total Time: {:.3}ms\n\n", self.total_duration_ms));
-
-        output.push_str(
-            "───────────────────────────────────────────────────────────────────────────\n",
-        );
-        output.push_str("EXECUTIONS\n");
-        output.push_str(
-            "───────────────────────────────────────────────────────────────────────────\n\n",
-        );
-
-        for (i, exec) in self.executions.iter().enumerate() {
-            output.push_str(&format!("{}. {}\n", i + 1, exec.hook_name));
-            output.push_str(&format!("   Stage: {}\n", exec.stage));
-
-            if let Some(ref pass) = exec.normalisation_pass {
-                output.push_str(&format!("   Pass: {}\n", pass));
-            }
-
-            output.push_str(&format!("   Permission: {}\n", exec.permission));
-            output.push_str(&format!("   Duration: {:.3}ms\n", exec.duration_ms));
-            output.push_str(&format!("   Modified: {}\n", exec.modified));
-
-            if let Some(ref error) = exec.error {
-                output.push_str(&format!("   ERROR: {}\n", error));
-            }
-
-            if let Some(ref metadata) = exec.metadata {
-                output.push_str(&format!("   Metadata: {}\n", metadata));
-            }
-
-            output.push('\n');
-        }
-
-        output.push_str(
-            "═══════════════════════════════════════════════════════════════════════════\n",
-        );
-
-        output
-    }
-}

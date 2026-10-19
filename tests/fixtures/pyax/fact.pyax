@@ -1,0 +1,10 @@
+# expect-exit: 0
+# recursion, comparison, arithmetic
+def fact(n: int) -> int:
+    if n <= 1:
+        return 1
+    return n * fact(n - 1)
+
+
+def main(args: list[str]) -> int:
+    return fact(10)

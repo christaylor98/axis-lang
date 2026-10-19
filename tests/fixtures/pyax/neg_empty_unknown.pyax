@@ -1,0 +1,5 @@
+# expect-error: neg_empty_unknown.pyax:5:16:
+# expect-error: cannot tell what this list holds yet
+def main(args: list[str]) -> int:
+    out = []
+    return out[0]

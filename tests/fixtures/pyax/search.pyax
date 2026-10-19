@@ -1,0 +1,41 @@
+# expect-exit: 0
+# return inside loops (early exit), strings, split/join, char iteration
+def find(xs: list[int], target: int) -> int:
+    for i, x in enumerate(xs):
+        if x == target:
+            return i
+    return -1
+
+
+def first_vowel(s: str) -> str:
+    for c in s:
+        if c in "aeiou":
+            return c
+    return "-"
+
+
+def count_words(text: str) -> int:
+    n = 0
+    for w in text.split(" "):
+        if len(w) > 0:
+            n += 1
+    return n
+
+
+def nested_find(n: int) -> int:
+    for i in range(n):
+        for j in range(n):
+            if i * j == 12:
+                return i * 100 + j
+    return 0
+
+
+def main(args: list[str]) -> int:
+    xs = [4, 8, 15, 16, 23, 42]
+    print(str(find(xs, 16)) + " " + str(find(xs, 5)))
+    print(first_vowel("rhythm and blues") + first_vowel("xyz"))
+    print(str(count_words("the quick  brown fox")))
+    words = "a,b,c".split(",")
+    print("-".join(words))
+    print(str(nested_find(10)))
+    return 0

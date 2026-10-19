@@ -1,0 +1,6 @@
+// AI3 fixture: bare variable tail.
+// Byte-identity anchor t3_bare_var — must equal the M1 bundle for
+//   fn t3(x: Int) -> Int { x }
+fn t3(x: Int) -> Int {
+  return x;
+}

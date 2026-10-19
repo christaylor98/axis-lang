@@ -1,7 +1,7 @@
-// Wave A: End-to-End Pipeline Integration
+// Wave A: End-to-End Pipeline Integration (Phase 3d: legacy Core IR 0.3 retired)
 //
-// This module integrates all waves (1-6) into a single executable pipeline:
-// spec files + source → lex → parse → generic AST → schema AST → Core IR → execution
+// This module integrates all waves into a single executable pipeline:
+// spec files + source → lex → parse → generic AST → schema AST → NF
 //
 // FORBIDDEN:
 // - Redesigning existing waves
@@ -12,7 +12,6 @@
 //
 // This is PURE INTEGRATION.
 
-use crate::execution::interpreter;
 use crate::frontend::ast_builder;
 use crate::frontend::ast_builder::ASTNode;
 use crate::frontend::lexer_engine;
@@ -25,10 +24,9 @@ use crate::frontend::schema_ast;
 use crate::frontend::schema_ast::SchemaAstNode;
 use crate::frontend::schema_load;
 use crate::frontend::token::{Span, Token};
-use crate::ir::core_ir::CoreBundle;
-use crate::nf_ast::NfAst;
 use crate::normalize::{NormalizationContext, NormalizationError};
 use crate::registry::Registry;
+use crate::registry::core05::fold::Scope;
 
 use std::fmt;
 use std::fs;
@@ -56,6 +54,9 @@ pub struct PipelineConfig {
     /// Registry for foreign function validation (REQUIRED)
     /// This is the authoritative registry from CLI --reg arguments
     pub registry: Registry,
+    /// Core IR 0.5 scope loaded from .axreg files (Phase 5).
+    /// When `Some`, the pipeline lowers the NF AST to a CoreBundle after normalization.
+    pub core05_scope: Option<Scope>,
     /// Parser mode: "grammar" (default) or "postfix" (for AI-1 RPN)
     pub parser_mode: Option<String>,
     /// Optional hook registry (WAVE 4)
@@ -71,10 +72,19 @@ pub struct PipelineArtifacts {
     pub parse_tree: ParseTree,
     /// Generic AST from structural projection
     pub generic_ast: ASTNode,
-    /// Schema AST from schema projection
-    pub schema_ast: SchemaAstNode,
-    /// Core IR bundle
-    pub core_ir: CoreBundle,
+    /// NF items from normalization (one per top-level declaration)
+    pub schema_asts: Vec<SchemaAstNode>,
+    /// Core IR 0.5 bundle (present when `PipelineConfig.core05_scope` is `Some`)
+    pub core_bundle: Option<crate::ir::core_ir_05::CoreBundle>,
+    /// Scope augmented with user-defined function signatures (set by spec-driven path).
+    /// Use this for verification so cross-function calls resolve correctly.
+    pub augmented_scope: Option<crate::registry::core05::fold::Scope>,
+    /// Expand and split modes only: one bundle per top-level fn, `(fn name, NF item, bundle)`.
+    /// Empty otherwise, where `core_bundle` is the whole file.
+    pub item_bundles: Vec<(String, SchemaAstNode, crate::ir::core_ir_05::CoreBundle)>,
+    /// Expand mode only: the Program expand produced (prelude, author and
+    /// lifted fns), before the split — the surface AST the goldens print.
+    pub expanded: Option<SchemaAstNode>,
 }
 
 /// Pipeline error - wraps all possible failures with span information
@@ -100,14 +110,30 @@ pub enum PipelineError {
     SchemaProject { message: String, span: Span },
     /// Normalization failed (YAML-driven engine)
     Normalization { message: String, span: Span },
+    /// Expand failed (PYAX_SURFACE_EXPAND_V1; only with an expand spec)
+    Expand { message: String, span: Span },
     /// NF validation failed (WAVE 1)
     NfValidation { message: String, span: Span },
     /// Lowering to Core IR failed
     Lower { message: String, span: Span },
-    /// Execution failed
-    Eval { message: String, span: Span },
     /// Inspection failed (Wave T1)
     Inspection { message: String },
+}
+
+impl PipelineError {
+    /// The source span the error points at, when it has one.
+    pub fn span(&self) -> Option<&Span> {
+        match self {
+            PipelineError::Lex { span, .. }
+            | PipelineError::Parse { span, .. }
+            | PipelineError::SchemaProject { span, .. }
+            | PipelineError::Normalization { span, .. }
+            | PipelineError::Expand { span, .. }
+            | PipelineError::NfValidation { span, .. }
+            | PipelineError::Lower { span, .. } => Some(span),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for PipelineError {
@@ -187,6 +213,9 @@ impl fmt::Display for PipelineError {
                     span.start, span.end, message
                 )
             }
+            PipelineError::Expand { message, span } => {
+                write!(f, "expand error at {}..{}: {}", span.start, span.end, message)
+            }
             PipelineError::NfValidation { message, span } => {
                 write!(
                     f,
@@ -201,13 +230,6 @@ impl fmt::Display for PipelineError {
                     span.start, span.end, message
                 )
             }
-            PipelineError::Eval { message, span } => {
-                write!(
-                    f,
-                    "execution error at {}..{}: {}",
-                    span.start, span.end, message
-                )
-            }
             PipelineError::Inspection { message } => {
                 write!(f, "inspection error: {}", message)
             }
@@ -217,21 +239,70 @@ impl fmt::Display for PipelineError {
 
 impl std::error::Error for PipelineError {}
 
-/// Run the full pipeline from specs to Core IR
+/// Run the full pipeline from specs to NF AST, then lower with the hardcoded path.
 ///
-/// This executes all stages:
-/// 1. Load all specs from disk
-/// 2. Load source file
-/// 3. Lex source using lexer spec
-/// 4. Parse tokens using parser spec
-/// 5. Build generic AST from parse tree
-/// 6. Project schema AST using AST schema
-/// 7. Validate NF compliance (WAVE 1)
-/// 8. Lower schema AST to Core IR
-///
-/// Returns all intermediate artifacts.
-/// All errors are fatal - no partial execution.
+/// Stages: lex → parse → AST → schema → normalize → lower (nf_lowering).
+/// Stage 6 only runs when `cfg.core05_scope` is `Some`.
+/// All errors are fatal — no partial execution.
 pub fn run_pipeline(cfg: &PipelineConfig) -> Result<PipelineArtifacts, PipelineError> {
+    run_pipeline_inner(cfg, None, false)
+}
+
+/// `run_pipeline` with every top-level fn lowered into its OWN bundle
+/// (`item_bundles`), as under expand but without the expand stage. `axis build`
+/// uses it: the bridge links one bundle per fn, and a file's shared bundle
+/// holds only its last fn, so a multi-fn M1/AI3 file cannot be linked from it.
+pub fn run_pipeline_split(cfg: &PipelineConfig) -> Result<PipelineArtifacts, PipelineError> {
+    run_pipeline_inner(cfg, None, true)
+}
+
+/// `run_pipeline` with the expand stage (PYAX_SURFACE_EXPAND_V1).
+///
+/// Three differences, all confined to this entry point:
+/// 1. the expand engine rewrites the projected Program — prelude items first,
+///    then the author's — before the Program split;
+/// 2. every top-level fn is lowered into its OWN bundle (`item_bundles`). A
+///    shared bundle has one root, so a sibling fn-ref cannot be linked, and the
+///    siblings' param slots leak into the root's arity at run time;
+/// 3. `core_bundle` is the last item's bundle, for callers that want one.
+pub fn run_pipeline_expanded(
+    cfg: &PipelineConfig,
+    expand: &crate::normalize::expand_engine::ExpandEngine,
+) -> Result<PipelineArtifacts, PipelineError> {
+    run_pipeline_inner(cfg, Some(expand), true)
+}
+
+/// Every registry function's signature by type name, for expand: the same
+/// scope lowering resolves calls through, so a surface with an expand stage
+/// types registry calls by the same rules as every other surface.
+fn registry_sigs(scope: &crate::registry::core05::fold::Scope) -> crate::normalize::expand_engine::RegistrySigs {
+    let type_names: std::collections::HashMap<_, _> = scope
+        .names
+        .iter()
+        .filter(|(_, h)| scope.types.contains_key(*h))
+        .map(|(n, h)| (*h, n.clone()))
+        .collect();
+    let name_of = |h: &crate::fabric::hash::Hash256| type_names.get(h).cloned().unwrap_or_else(|| h.to_hex());
+    scope
+        .names
+        .iter()
+        .filter_map(|(n, h)| {
+            scope.fns.get(h).map(|g| {
+                (n.clone(), crate::normalize::expand_engine::RegSig {
+                    params: g.inputs.iter().map(name_of).collect(),
+                    ret: name_of(&g.output),
+                    variadic: g.variadic,
+                })
+            })
+        })
+        .collect()
+}
+
+fn run_pipeline_inner(
+    cfg: &PipelineConfig,
+    expand: Option<&crate::normalize::expand_engine::ExpandEngine>,
+    split: bool,
+) -> Result<PipelineArtifacts, PipelineError> {
     // STAGE 0: Load all specs
     let lexer_spec =
         lexspec_load::load_spec(&cfg.lexer_spec).map_err(|e| PipelineError::LexerSpecLoad {
@@ -316,12 +387,68 @@ pub fn run_pipeline(cfg: &PipelineConfig) -> Result<PipelineArtifacts, PipelineE
         })?;
 
     // STAGE 5: Project schema AST
-    let schema_ast = schema_ast::project_schema_ast(&generic_ast, &ast_schema).map_err(|e| {
+    let raw_schema = schema_ast::project_schema_ast(&generic_ast, &ast_schema).map_err(|e| {
         PipelineError::SchemaProject {
             message: e.message,
             span: e.span,
         }
     })?;
+
+    let mut expanded = None;
+    // EXPAND (opt-in): AST -> AST, before the Program split, so the items it
+    // adds (the prelude now, lifted fns in phase 2) go through the same split.
+    let raw_schema = match expand {
+        None => raw_schema,
+        Some(engine) => {
+            let prelude_items = match engine.prelude_path() {
+                None => Vec::new(),
+                Some(path) => {
+                    let text = fs::read_to_string(&path).map_err(|e| PipelineError::Io {
+                        message: e.to_string(),
+                        path: path.clone(),
+                    })?;
+                    let at = |m: String| format!("in prelude {}: {}", path.display(), m);
+                    let toks = lexer_engine::lex_with_spec(&lexer_spec, &text).map_err(|e| PipelineError::Expand {
+                        message: at(e.message),
+                        span: e.span.unwrap_or(Span::new(0, 0)),
+                    })?;
+                    let tree = parser_runtime::parse_with_spec(&parser_spec, &toks).map_err(|e| PipelineError::Expand {
+                        message: at(e.message),
+                        span: e.span,
+                    })?;
+                    let gen = ast_builder::build_generic_ast(&tree).map_err(|e| PipelineError::Expand {
+                        message: at(e.message),
+                        span: Span::new(0, 0),
+                    })?;
+                    let proj = schema_ast::project_schema_ast(&gen, &ast_schema).map_err(|e| PipelineError::Expand {
+                        message: at(e.message),
+                        span: e.span,
+                    })?;
+                    match proj.fields.get("items") {
+                        Some(schema_ast::SchemaValue::Nodes(ns)) => ns.clone(),
+                        _ => vec![proj],
+                    }
+                }
+            };
+            let registry = cfg.core05_scope.as_ref().map(registry_sigs);
+            let program = engine.expand_program_with_registry(raw_schema, prelude_items, registry.as_ref()).map_err(|e| PipelineError::Expand {
+                message: e.message,
+                span: e.span,
+            })?;
+            expanded = Some(program.clone());
+            program
+        }
+    };
+
+    // Split Program items before normalization — Program must never exist in NF
+    let raw_items: Vec<SchemaAstNode> = if raw_schema.kind == "Program" {
+        match raw_schema.fields.get("items") {
+            Some(schema_ast::SchemaValue::Nodes(ns)) => ns.clone(),
+            _ => vec![raw_schema],
+        }
+    } else {
+        vec![raw_schema]
+    };
 
     // STAGE 5.5: YAML-driven Normalization (MANDATORY)
     // Transform Schema AST to Normal Form using YAML rules
@@ -332,63 +459,83 @@ pub fn run_pipeline(cfg: &PipelineConfig) -> Result<PipelineArtifacts, PipelineE
         }
     })?;
 
-    let nf_ast: NfAst = normalization_ctx
-        .normalize(schema_ast)
-        .map_err(|e| match e {
-            NormalizationError::ValidationError(v) => PipelineError::NfValidation {
-                message: v.message.clone(),
-                span: v.span,
-            },
-            _ => PipelineError::Normalization {
-                message: format!("{}", e),
+    let schema_asts: Vec<SchemaAstNode> = raw_items
+        .into_iter()
+        .map(|item| {
+            normalization_ctx
+                .normalize(item)
+                .map_err(|e| match e {
+                    NormalizationError::ValidationError(v) => PipelineError::NfValidation {
+                        message: v.message.clone(),
+                        span: v.span,
+                    },
+                    _ => PipelineError::Normalization {
+                        message: format!("{}", e),
+                        span: Span::new(0, 0),
+                    },
+                })
+                .map(|nf| nf.into_node())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // STAGE 6: Core IR 0.5 lowering (when a scope is provided)
+    //
+    // When a scope is supplied, every FnDecl in the normalized program is first
+    // entered into a per-call augmented scope (§5b identity, Leaf/Pure default)
+    // so cross-function calls within the same file resolve at lowering and
+    // verification time. All items are then lowered into one shared bundle.
+    let mut item_bundles = Vec::new();
+    let (core_bundle, augmented_scope) = if let Some(scope) = &cfg.core05_scope {
+        let aug = crate::lowering::nf_lowering::augment_scope_with_user_fns(scope, &schema_asts)
+            .map_err(|e| PipelineError::Lower {
+                message: e.to_string(),
                 span: Span::new(0, 0),
-            },
-        })?;
-
-    // STAGE 6: Mechanical lowering (NF-only, type-enforced)
-    // Use registry from config (authoritative CLI-provided registry)
-    let registry = cfg.registry.clone();
-
-    // Mechanical lowering: NfAst → CoreBundle
-    // This is 100% code-driven, no config file
-    // Uses universal NF lowerer that matches NORMAL_FORM_SPEC_0.1.yaml exactly
-    let core_ir = crate::lowering::nf_lowering::lower_nf_to_bundle(nf_ast.node(), registry)
-        .map_err(|e| PipelineError::Lower {
-            message: e.message,
-            span: e.span,
-        })?;
+            })?;
+        if split {
+            for item in &schema_asts {
+                let name = match item.fields.get("name") {
+                    Some(schema_ast::SchemaValue::Token(t)) => t.lexeme.clone(),
+                    _ => {
+                        return Err(PipelineError::Lower {
+                            message: format!("split mode: top-level item '{}' has no name", item.kind),
+                            span: item.span.clone(),
+                        })
+                    }
+                };
+                let bundle = crate::lowering::nf_lowering::lower_nf_to_bundle_05(item, &aug)
+                    .map_err(|e| PipelineError::Lower {
+                        message: match expand {
+                            // The author's name (`main`, not `pyax_main`), or
+                            // "a loop body in `f`" for a lifted fn.
+                            Some(engine) => format!("in {}: {}", engine.describe_fn(&name), e),
+                            None => format!("in `{}`: {}", name, e),
+                        },
+                        span: item.span.clone(),
+                    })?;
+                item_bundles.push((name, item.clone(), bundle));
+            }
+            let last = item_bundles.last().map(|(_, _, b)| b.clone());
+            (last, Some(aug))
+        } else {
+            let bundle = crate::lowering::nf_lowering::lower_nf_items_to_bundle_05(&schema_asts, &aug)
+                .map_err(|e| PipelineError::Lower {
+                    message: e.to_string(),
+                    span: Span::new(0, 0),
+                })?;
+            (Some(bundle), Some(aug))
+        }
+    } else {
+        (None, None)
+    };
 
     Ok(PipelineArtifacts {
         tokens,
         parse_tree,
         generic_ast,
-        schema_ast: nf_ast.node().clone(),
-        core_ir,
+        schema_asts,
+        core_bundle,
+        augmented_scope,
+        item_bundles,
+        expanded,
     })
-}
-
-/// Run the full pipeline and execute the resulting Core IR
-///
-/// This is a convenience wrapper that:
-/// 1. Runs the full pipeline to get Core IR
-/// 2. Executes the Core IR using the execution substrate
-/// 3. Returns the final runtime value
-///
-/// All errors are fatal - no partial execution.
-pub fn run_and_eval(
-    cfg: &PipelineConfig,
-    registry: Registry,
-) -> Result<interpreter::Value, PipelineError> {
-    // Run pipeline to get Core IR
-    let artifacts = run_pipeline(cfg)?;
-
-    // Execute Core IR
-    let value = interpreter::eval_bundle(&artifacts.core_ir, registry).map_err(|e| {
-        PipelineError::Eval {
-            message: e.message,
-            span: e.span,
-        }
-    })?;
-
-    Ok(value)
 }

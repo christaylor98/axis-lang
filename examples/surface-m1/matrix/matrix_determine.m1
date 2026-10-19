@@ -1,0 +1,5 @@
+// Matrix fixture: DetermineExpr
+// Author-written determinacy discharge gate; lowers to CDeterminate.
+fn f(x: Bool) -> Bool {
+  determine
+}

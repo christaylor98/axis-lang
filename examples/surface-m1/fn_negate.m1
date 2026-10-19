@@ -1,0 +1,3 @@
+fn negate(flag: Bool) -> Bool {
+  if flag { Bool(false) } else { Bool(true) }
+}

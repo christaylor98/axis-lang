@@ -1,0 +1,7 @@
+// Test 5: List construction
+// Expected: PASS
+
+fn main() {
+  items = List(Value(Int(1), Text("a")), Value(Int(2), Text("b")));
+  items
+}

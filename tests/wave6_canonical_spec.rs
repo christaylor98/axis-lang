@@ -1,10 +1,10 @@
 // Tests for the canonical user-provided lexer spec
 // This is the first milestone config file: lang-lab-poc-userfiles/lexer.yaml
 
-use axis_lang_lab::frontend::lexer_engine::lex_with_spec;
-use axis_lang_lab::frontend::lexspec_load::load_spec;
-use axis_lang_lab::frontend::token::TokenKind;
-use axis_lang_lab::native_lex::lex_str;
+use axis_lang::frontend::lexer_engine::lex_with_spec;
+use axis_lang::frontend::lexspec_load::load_spec;
+use axis_lang::frontend::token::TokenKind;
+use axis_lang::native_lex::lex_str;
 use std::path::PathBuf;
 
 #[path = "wave6_invariants.rs"]

@@ -1,0 +1,3 @@
+// AI3 NEGATIVE: empty body. A Body must contain a ReturnStmt.
+fn n() -> Int {
+}

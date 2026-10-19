@@ -1,0 +1,19 @@
+# expect-exit: 0
+# Python's repr of containers: nested lists, tuples, dicts, quoting of texts
+from decimal import Decimal
+
+
+def main(args: list[str]) -> int:
+    grid = [[1, 2], [3]]
+    print(grid, [[]] == [[]])
+    t = ("it's", 2, True, 1.5)
+    print(t)
+    one = (7,)
+    print(one, str(one))
+    d = {"a": [1, 2], "b": []}
+    print(d, {1: "x"})
+    print(["tab\there", 'say "hi"', "back\\slash"])
+    print([Decimal("1.10")], [0.5, 2.0])
+    s = str([1, 2])
+    print(len(s), s)
+    return 0

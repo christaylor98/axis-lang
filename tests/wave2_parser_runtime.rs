@@ -1,11 +1,11 @@
 // Wave 2 Parser Runtime Integration Tests
 // Tests runtime parser engine with real specs and tokens
 
-use axis_lang_lab::frontend::parser_runtime::{parse_with_spec, ParseNode};
-use axis_lang_lab::frontend::parserspec::{
+use axis_lang::frontend::parser_runtime::{parse_with_spec, ParseNode};
+use axis_lang::frontend::parserspec::{
     Element, ParserSpec, Production, RepeatKind, Terminal, TerminalSource,
 };
-use axis_lang_lab::frontend::token::{Span, Token, TokenKind};
+use axis_lang::frontend::token::{Span, Token, TokenKind};
 use std::collections::HashMap;
 
 // Helper to create tokens

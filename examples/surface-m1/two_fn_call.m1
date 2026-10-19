@@ -1,0 +1,8 @@
+// M1: cross-function call — one user-defined fn calling another.
+fn negate(flag: Bool) -> Bool {
+  if flag { Bool(false) } else { Bool(true) }
+}
+
+fn double_negate(flag: Bool) -> Bool {
+  negate(negate(flag))
+}

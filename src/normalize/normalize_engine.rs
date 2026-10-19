@@ -186,12 +186,20 @@ impl NormalizationEngine {
                 return self.unwrap_transparent_node(node);
             }
             "unwrap_program_items" | "extract_first_item" | "extract_first_decl" => {
-                // Unwrap Program/root nodes to single item (HARD ERROR if multiple items)
-                return self.unwrap_program_to_single_item(node);
+                // Single item → unwrap; multi-item → Program{items}
+                return self.unwrap_program_items(node);
             }
             "extract_first_element" => {
                 // Extract first element from a single-element list field
                 return self.extract_first_element(node);
+            }
+            "fold_body_to_let_chain" => {
+                // Body{bindings, result} → nested LetExpr (or just result if 0 bindings)
+                return self.fold_body_to_let_chain(node);
+            }
+            "fold_stmts_to_let_chain" => {
+                // BlockContent{items: [LetBinding*, result_expr]} → nested LetExpr chain
+                return self.fold_stmts_to_let_chain(node);
             }
             other => other.to_string(),
         };
@@ -210,7 +218,7 @@ impl NormalizationEngine {
         // Common patterns: variant, content, expr, value, inner, etc.
 
         // Try common unwrap field names
-        for field_name in &["variant", "content", "expr", "value", "inner", "body"] {
+        for field_name in &["variant", "content", "expr", "value", "inner", "body", "left", "target"] {
             if let Some(SchemaValue::Node(inner)) = node.fields.get(*field_name) {
                 return Ok((**inner).clone());
             }
@@ -218,7 +226,7 @@ impl NormalizationEngine {
 
         Err(RewriteError {
             message: format!(
-                "Transparent node '{}' has no unwrappable field (tried: variant, content, expr, value, inner, body)",
+                "Transparent node '{}' has no unwrappable field (tried: variant, content, expr, value, inner, body, left, target)",
                 node.kind
             ),
             node_kind: node.kind.clone(),
@@ -226,7 +234,7 @@ impl NormalizationEngine {
         })
     }
 
-    fn unwrap_program_to_single_item(
+    fn unwrap_program_items(
         &self,
         node: &SchemaAstNode,
     ) -> Result<SchemaAstNode, RewriteError> {
@@ -250,7 +258,6 @@ impl NormalizationEngine {
             }
         };
 
-        // HARD ERROR: multi-item programs not supported (NF contract violation)
         if items.is_empty() {
             return Err(RewriteError {
                 message: "Program must contain at least one item (empty programs not supported)"
@@ -260,19 +267,172 @@ impl NormalizationEngine {
             });
         }
 
-        if items.len() > 1 {
+        // Single item: unwrap to the item directly (backward-compatible)
+        if items.len() == 1 {
+            return Ok(items[0].clone());
+        }
+
+        // Multi-item: pipeline splits Program before normalization; reaching here is a bug
+        Err(RewriteError {
+            message: format!(
+                "Program with {} items reached normalizer — pipeline must split before normalization",
+                items.len()
+            ),
+            node_kind: node.kind.clone(),
+            span: node.span.clone(),
+        })
+    }
+
+    fn fold_body_to_let_chain(
+        &self,
+        body_node: &SchemaAstNode,
+    ) -> Result<SchemaAstNode, RewriteError> {
+        // Extract bindings (already-normalized LetBinding list) and result
+        let bindings: &[SchemaAstNode] = match body_node.fields.get("bindings") {
+            Some(SchemaValue::Nodes(nodes)) => nodes.as_slice(),
+            None => &[],
+            _ => &[],
+        };
+
+        let result: SchemaAstNode = match body_node.fields.get("result") {
+            Some(SchemaValue::Node(n)) => (**n).clone(),
+            _ => {
+                return Err(RewriteError {
+                    message: "Body missing 'result' node field".to_string(),
+                    node_kind: body_node.kind.clone(),
+                    span: body_node.span.clone(),
+                })
+            }
+        };
+
+        // Zero bindings: fold to just the result (no LetExpr wrapper)
+        if bindings.is_empty() {
+            return Ok(result);
+        }
+
+        // n bindings → n nested LetExpr, right-to-left (innermost body = result)
+        let mut current = result;
+        for binding in bindings.iter().rev() {
+            let name_tok = match binding.fields.get("name") {
+                Some(SchemaValue::Token(t)) => t.clone(),
+                _ => {
+                    return Err(RewriteError {
+                        message: "LetBinding missing 'name' token field".to_string(),
+                        node_kind: binding.kind.clone(),
+                        span: binding.span.clone(),
+                    })
+                }
+            };
+            let value_node = match binding.fields.get("value") {
+                Some(SchemaValue::Node(n)) => n.clone(),
+                _ => {
+                    return Err(RewriteError {
+                        message: "LetBinding missing 'value' node field".to_string(),
+                        node_kind: binding.kind.clone(),
+                        span: binding.span.clone(),
+                    })
+                }
+            };
+
+            let mut let_fields = std::collections::HashMap::new();
+            let_fields.insert("name".to_string(), SchemaValue::Token(name_tok));
+            let_fields.insert("value".to_string(), SchemaValue::Node(value_node));
+            let_fields.insert("body".to_string(), SchemaValue::Node(Box::new(current)));
+
+            current = SchemaAstNode {
+                kind: "LetExpr".to_string(),
+                fields: let_fields,
+                annotations: binding.annotations.clone(),
+                span: binding.span.clone(),
+            };
+        }
+
+        Ok(current)
+    }
+
+    fn fold_stmts_to_let_chain(
+        &self,
+        block_content: &SchemaAstNode,
+    ) -> Result<SchemaAstNode, RewriteError> {
+        // BlockContent{items: [LetBinding*, result_expr]} → nested LetExpr chain.
+        // Bottom-up: children are already normalized, so AssignStmts are LetBindings.
+        let items: &[SchemaAstNode] = match block_content.fields.get("items") {
+            Some(SchemaValue::Nodes(nodes)) => nodes.as_slice(),
+            _ => {
+                return Err(RewriteError {
+                    message: "BlockContent missing 'items' list field".to_string(),
+                    node_kind: block_content.kind.clone(),
+                    span: block_content.span.clone(),
+                })
+            }
+        };
+
+        if items.is_empty() {
             return Err(RewriteError {
-                message: format!(
-                    "Program contains {} items but only single-item programs are supported (multi-item requires module system - deferred to future NF version)",
-                    items.len()
-                ),
-                node_kind: node.kind.clone(),
-                span: node.span.clone(),
+                message: "BlockContent is empty — a function body must have at least one expression".to_string(),
+                node_kind: block_content.kind.clone(),
+                span: block_content.span.clone(),
             });
         }
 
-        // Extract single item (already normalized by bottom-up traversal)
-        Ok(items[0].clone())
+        // Last item is the result expression.
+        let result = items.last().unwrap().clone();
+
+        // All preceding items must be LetBinding nodes.
+        let bindings = &items[..items.len() - 1];
+        for b in bindings {
+            if b.kind != "LetBinding" {
+                return Err(RewriteError {
+                    message: format!(
+                        "expected LetBinding (from AssignStmt) before result expression, found '{}'",
+                        b.kind
+                    ),
+                    node_kind: b.kind.clone(),
+                    span: b.span.clone(),
+                });
+            }
+        }
+
+        if bindings.is_empty() {
+            return Ok(result);
+        }
+
+        // Fold right-to-left: innermost body = result.
+        let mut current = result;
+        for binding in bindings.iter().rev() {
+            let name_tok = match binding.fields.get("name") {
+                Some(SchemaValue::Token(t)) => t.clone(),
+                _ => {
+                    return Err(RewriteError {
+                        message: "LetBinding missing 'name' token".to_string(),
+                        node_kind: binding.kind.clone(),
+                        span: binding.span.clone(),
+                    })
+                }
+            };
+            let value_node = match binding.fields.get("value") {
+                Some(SchemaValue::Node(n)) => n.clone(),
+                _ => {
+                    return Err(RewriteError {
+                        message: "LetBinding missing 'value' node".to_string(),
+                        node_kind: binding.kind.clone(),
+                        span: binding.span.clone(),
+                    })
+                }
+            };
+            let mut let_fields = std::collections::HashMap::new();
+            let_fields.insert("name".to_string(), SchemaValue::Token(name_tok));
+            let_fields.insert("value".to_string(), SchemaValue::Node(value_node));
+            let_fields.insert("body".to_string(), SchemaValue::Node(Box::new(current)));
+            current = SchemaAstNode {
+                kind: "LetExpr".to_string(),
+                fields: let_fields,
+                annotations: binding.annotations.clone(),
+                span: binding.span.clone(),
+            };
+        }
+
+        Ok(current)
     }
 
     fn extract_first_element(&self, node: &SchemaAstNode) -> Result<SchemaAstNode, RewriteError> {

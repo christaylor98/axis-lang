@@ -1,6 +1,5 @@
 // Test: while loop construct
-// This tests: WhileExpr desugaring target
-// Expected: Parses successfully, passes NF validation after desugaring
+// Expected: FAIL at NF validation (WhileExpr is in forbidden set)
 
 fn countdown(n) {
   while n {

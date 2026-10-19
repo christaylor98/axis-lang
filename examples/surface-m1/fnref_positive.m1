@@ -1,0 +1,21 @@
+// AXIS_FN_REF_ARG_VERIFY_V1 — positive case.
+// `fnref_caller` passes `fnref_handler` by NAME to `apply_handler`, which is
+// declared `in (Fn)` in registries/fnref_test.axreg.
+//
+// Expected: compiles AND verifies clean (no --no-verify). The emitted bundle
+// for `fnref_caller` must contain exactly one fn-ref pool constant whose
+// defHash is the registry Fn type and whose 32-byte payload is
+// sha256("fnref_handler") =
+// a33d41bfbaff77888f78865087887e053d10f29f18ba9dce729bf716129b747b.
+//
+// (handler param is Int — Value as a parameter type triggers a pre-existing
+// M1 parse error unrelated to the fn-ref feature; the param type is
+// irrelevant to fn-ref semantics, which only carry the target's identity.)
+
+fn fnref_handler(p: Int) -> Unit {
+  Unit()
+}
+
+fn fnref_caller() -> Unit {
+  apply_handler(fnref_handler)
+}

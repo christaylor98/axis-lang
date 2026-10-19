@@ -1,0 +1,30 @@
+# expect-exit: 0
+# ord/chr, **, str predicates, split(), enumerate over a text, sorted(dict),
+# assert, typing imports
+from typing import List, Dict
+
+
+def caesar(s: str, k: int) -> str:
+    out = ""
+    for c in s:
+        if c.islower():
+            out += chr((ord(c) - ord("a") + k) % 26 + ord("a"))
+        else:
+            out += c
+    return out
+
+
+def main(args: List[str]) -> int:
+    print(caesar("hello, world", 3))
+    print(2 ** 10, -2 ** 2, 3 ** 0)
+    print("abc".islower(), "aBc".islower(), "ABC".isupper(), "123".isdigit(), "12a".isdigit())
+    print("abc".isalpha(), " \t".isspace(), "".isalpha())
+    words = "  the  quick brown   fox ".split()
+    print(words, len(words))
+    word = "hey"
+    for i, c in enumerate(word):
+        print(i, c)
+    d: Dict[str, int] = {"b": 2, "a": 1, "c": 3}
+    print(sorted(d), max(d))
+    assert len(words) == 4, "four words"
+    return 0

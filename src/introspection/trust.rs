@@ -9,7 +9,7 @@
 
 use crate::introspection::provenance::ProvenanceAnnotation;
 use crate::introspection::trace_graph::TraceGraph;
-use crate::ir::core_ir::{Annotation, CoreTerm};
+use crate::frontend::schema_ast::Annotation;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TRUST INVARIANT ERRORS
@@ -118,107 +118,61 @@ pub fn verify_annotation_namespaces(
     }
 }
 
-/// Verify that Core IR annotations don't affect execution
+// verify_annotations_ignored_structurally / strip_annotations (legacy 0.3 CoreTerm path)
+// removed in Phase 3d.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core IR 0.5 flat-table invariant verifier (additive — Phase 3c)
+//
+// The builder already enforces these invariants at construction time. This
+// verifier is an explicit, readable re-statement for testing and auditing.
+// The legacy `verify_annotations_ignored_structurally` (CoreTerm tree) is untouched.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Verify the DAG invariants of a Core IR 0.5 bundle (flat-table read path).
 ///
-/// This is a semantic check: we verify that two Core IR terms that differ
-/// only in annotations evaluate to the same result.
-///
-/// NOTE: This is a structural check only (we don't actually execute).
-/// The real guarantee comes from the execution engine ignoring annotations.
-pub fn verify_annotations_ignored_structurally(
-    term1: &CoreTerm,
-    term2: &CoreTerm,
+/// Checks: every NodeRef::Node(j) inside node[i] satisfies j < i (no forward
+/// edges); every NodeRef::Pool(j) satisfies j < pool_len (in-range pool ref).
+/// Returns `Ok(())` if all invariants hold, `Err(message)` on the first violation.
+pub fn verify_bundle_dag_05(
+    bundle: &crate::ir::core_ir_05::CoreBundle,
 ) -> Result<(), String> {
-    // Strip annotations and compare
-    let stripped1 = strip_annotations(term1);
-    let stripped2 = strip_annotations(term2);
+    use crate::ir::core_ir_05::{Node, NodeRef};
 
-    if stripped1 == stripped2 {
-        Ok(())
-    } else {
-        Err("Terms differ in more than just annotations".to_string())
-    }
-}
+    let pool_len = bundle.constant_pool.len() as u32;
 
-/// Strip all annotations from a Core IR term
-fn strip_annotations(term: &CoreTerm) -> CoreTerm {
-    match term {
-        CoreTerm::CIntLit { value, node_id, .. } => CoreTerm::CIntLit {
-            value: *value,
-            node_id: *node_id,
-            annotations: Vec::new(),
-        },
-        CoreTerm::CBoolLit { value, node_id, .. } => CoreTerm::CBoolLit {
-            value: *value,
-            node_id: *node_id,
-            annotations: Vec::new(),
-        },
-        CoreTerm::CUnitLit { node_id, .. } => CoreTerm::CUnitLit {
-            node_id: *node_id,
-            annotations: Vec::new(),
-        },
-        CoreTerm::CLam {
-            param,
-            body,
-            node_id,
-            ..
-        } => CoreTerm::CLam {
-            param: param.clone(),
-            body: Box::new(strip_annotations(body)),
-            node_id: *node_id,
-            annotations: Vec::new(),
-        },
-        CoreTerm::CLet {
-            name,
-            value,
-            body,
-            node_id,
-            ..
-        } => CoreTerm::CLet {
-            name: name.clone(),
-            value: Box::new(strip_annotations(value)),
-            body: Box::new(strip_annotations(body)),
-            node_id: *node_id,
-            annotations: Vec::new(),
-        },
-        CoreTerm::CIf {
-            cond,
-            then_branch,
-            else_branch,
-            node_id,
-            ..
-        } => CoreTerm::CIf {
-            cond: Box::new(strip_annotations(cond)),
-            then_branch: Box::new(strip_annotations(then_branch)),
-            else_branch: Box::new(strip_annotations(else_branch)),
-            node_id: *node_id,
-            annotations: Vec::new(),
-        },
-        CoreTerm::CVar { name, node_id, .. } => CoreTerm::CVar {
-            name: name.clone(),
-            node_id: *node_id,
-            annotations: Vec::new(),
-        },
-        CoreTerm::CApp {
-            func, arg, node_id, ..
-        } => CoreTerm::CApp {
-            func: Box::new(strip_annotations(func)),
-            arg: Box::new(strip_annotations(arg)),
-            node_id: *node_id,
-            annotations: Vec::new(),
-        },
-        CoreTerm::CCall {
-            target_name,
-            args,
-            node_id,
-            ..
-        } => CoreTerm::CCall {
-            target_name: target_name.clone(),
-            args: args.iter().map(strip_annotations).collect(),
-            node_id: *node_id,
-            annotations: Vec::new(),
-        },
+    let check_ref = |nr: NodeRef, node_idx: usize| -> Result<(), String> {
+        match nr {
+            NodeRef::Node(j) if (j as usize) >= node_idx => Err(format!(
+                "node[{}] has forward edge to node[{}] — DAG invariant violated",
+                node_idx, j
+            )),
+            NodeRef::Pool(j) if j >= pool_len => Err(format!(
+                "node[{}] pool ref {} out of range (pool len {})",
+                node_idx, j, pool_len
+            )),
+            _ => Ok(()),
+        }
+    };
+
+    for (i, node) in bundle.nodes.iter().enumerate() {
+        match node {
+            Node::CCall { args, .. } => {
+                for &arg in args {
+                    check_ref(arg, i)?;
+                }
+            }
+            Node::CIf { cond, then_, else_ } => {
+                check_ref(*cond, i)?;
+                check_ref(*then_, i)?;
+                check_ref(*else_, i)?;
+            }
+            Node::CEnd { value } => check_ref(*value, i)?,
+            Node::CDeterminate | Node::CBlock => {}
+        }
     }
+    check_ref(bundle.result, bundle.nodes.len())?;
+    Ok(())
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -272,7 +226,7 @@ mod tests {
     use crate::frontend::token::{Span, Token, TokenKind};
     use crate::introspection::provenance::ProvenanceAnnotationSet;
     use crate::introspection::trace_graph::TraceGraphBuilder;
-    use crate::ir::core_ir::AnnotationValue;
+    use crate::frontend::schema_ast::AnnotationValue;
 
     #[test]
     fn test_verify_valid_trace_graph() {
@@ -333,46 +287,8 @@ mod tests {
         assert_eq!(errors.len(), 1);
     }
 
-    #[test]
-    fn test_strip_annotations() {
-        let term_with_annotations = CoreTerm::CUnitLit {
-            node_id: Some(1),
-            annotations: vec![Annotation {
-                key: "test".to_string(),
-                value: AnnotationValue::String("value".to_string()),
-            }],
-        };
-
-        let stripped = strip_annotations(&term_with_annotations);
-
-        match stripped {
-            CoreTerm::CUnitLit { annotations, .. } => {
-                assert!(annotations.is_empty());
-            }
-            _ => panic!("Wrong term kind"),
-        }
-    }
-
-    #[test]
-    fn test_verify_annotations_ignored() {
-        let term1 = CoreTerm::CUnitLit {
-            node_id: Some(1),
-            annotations: vec![Annotation {
-                key: "test1".to_string(),
-                value: AnnotationValue::String("value1".to_string()),
-            }],
-        };
-
-        let term2 = CoreTerm::CUnitLit {
-            node_id: Some(1),
-            annotations: vec![Annotation {
-                key: "test2".to_string(),
-                value: AnnotationValue::String("value2".to_string()),
-            }],
-        };
-
-        assert!(verify_annotations_ignored_structurally(&term1, &term2).is_ok());
-    }
+    // test_strip_annotations / test_verify_annotations_ignored
+    // (legacy 0.3 CoreTerm path) removed in Phase 3d.
 
     #[test]
     fn test_verify_trace_determinism() {
@@ -401,5 +317,100 @@ mod tests {
         let graph2 = builder2.build();
 
         assert!(verify_trace_determinism(&graph1, &graph2).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod tests_05 {
+    use super::verify_bundle_dag_05;
+
+    const PILOT_AXREG: &str = include_str!("../../registries/pilot_lowering.axreg");
+
+    fn pilot_scope() -> crate::registry::core05::fold::Scope {
+        crate::registry::core05::text::lower(PILOT_AXREG)
+            .expect("pilot registry must load cleanly")
+            .scope
+    }
+
+    // ── 1. Builder-produced bundle always satisfies the invariants ────────────
+
+    #[test]
+    fn valid_bundle_passes() {
+        use crate::frontend::schema_ast::{SchemaAstNode, SchemaValue};
+        use crate::frontend::token::Span;
+        use crate::lowering::nf_lowering::lower_nf_to_bundle_05;
+        use std::collections::HashMap;
+
+        let scope = pilot_scope();
+        let unit = SchemaAstNode {
+            kind: "UnitLit".to_string(),
+            fields: HashMap::new(),
+            annotations: Default::default(),
+            span: Span::new(0, 2),
+        };
+        let mut fields = HashMap::new();
+        fields.insert("condition".to_string(), SchemaValue::Node(Box::new(unit.clone())));
+        fields.insert("then_branch".to_string(), SchemaValue::Node(Box::new(unit.clone())));
+        fields.insert("else_branch".to_string(), SchemaValue::Node(Box::new(unit)));
+        let if_node = SchemaAstNode {
+            kind: "IfExpr".to_string(),
+            fields,
+            annotations: Default::default(),
+            span: Span::new(0, 10),
+        };
+        let bundle = lower_nf_to_bundle_05(&if_node, &scope).unwrap();
+        assert!(verify_bundle_dag_05(&bundle).is_ok(), "builder-produced bundle must satisfy DAG invariants");
+    }
+
+    // ── 2. Manually-crafted forward edge is detected ──────────────────────────
+
+    #[test]
+    fn forward_edge_detected() {
+        use crate::ir::core_ir_05::{ConstantPoolEntry, CoreBundle, Node, NodeRef};
+        use crate::lowering::emit_05::unit_type_id;
+
+        let pool_entry = ConstantPoolEntry { def_hash: unit_type_id(), payload: vec![] };
+
+        // node[0] is CIf whose then_ references node[1] (forward edge — invalid)
+        let forward_bundle = CoreBundle {
+            version: "0.5".to_string(),
+            constant_pool: vec![pool_entry.clone()],
+            nodes: vec![
+                Node::CIf {
+                    cond: NodeRef::Pool(0),
+                    then_: NodeRef::Node(1),  // forward edge!
+                    else_: NodeRef::Pool(0),
+                },
+                Node::CIf {
+                    cond: NodeRef::Pool(0),
+                    then_: NodeRef::Pool(0),
+                    else_: NodeRef::Pool(0),
+                },
+            ],
+            result: NodeRef::Node(1),
+        };
+        assert!(verify_bundle_dag_05(&forward_bundle).is_err(), "forward edge must be detected");
+    }
+
+    // ── 3. Minimal bundle (pool entry, no nodes) is trivially valid ──────────
+    //
+    // A truly EMPTY bundle (no nodes, no pool) can no longer have a valid
+    // `result` ref at all — every bundle must reference something. That's
+    // fine: real lowering always interns at least one pool entry (even a
+    // bare `Unit()` tail does), so an all-empty bundle was never reachable
+    // from a real program anyway. This test now covers the actual minimal
+    // case: a bundle whose result is a bare pool entry with zero nodes.
+
+    #[test]
+    fn empty_bundle_is_valid() {
+        use crate::ir::core_ir_05::{ConstantPoolEntry, CoreBundle, NodeRef};
+        use crate::lowering::emit_05::unit_type_id;
+        let bundle = CoreBundle {
+            version: "0.5".to_string(),
+            constant_pool: vec![ConstantPoolEntry { def_hash: unit_type_id(), payload: vec![] }],
+            nodes: vec![],
+            result: NodeRef::Pool(0),
+        };
+        assert!(verify_bundle_dag_05(&bundle).is_ok());
     }
 }

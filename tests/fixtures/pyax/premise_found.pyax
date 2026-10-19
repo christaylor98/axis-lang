@@ -1,0 +1,26 @@
+# expect-exit: 0
+# from the premise rerun: a dict read (counts[w] + 1) in one branch before the
+# store that types it in the other; min / max of a list of tuples
+def top_word(s: str) -> str:
+    words = s.split(" ")
+    counts = {}
+    order = []
+    for w in words:
+        if w != "":
+            if w in counts:
+                counts[w] = counts[w] + 1
+            else:
+                counts[w] = 1
+                order.append(w)
+    best = ""
+    best_count = 0
+    for w in order:
+        if counts[w] > best_count:
+            best_count = counts[w]
+            best = w
+    return best
+
+
+def main(args: list[str]) -> None:
+    pairs = [(3, "c"), (1, "z"), (1, "a"), (3, "b")]
+    print(top_word("the cat the dog the cat"), min(pairs), max(pairs))

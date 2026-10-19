@@ -1,0 +1,3 @@
+fn main() {
+  Decimal(15.60)
+}

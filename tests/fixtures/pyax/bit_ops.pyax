@@ -1,0 +1,29 @@
+# expect-exit: 0
+# Python's bit operators on int (INT_BIT_OPS_V1), with Python's precedence: | looser than ^, looser than &, looser
+# than << >>, looser than + -; ~ binds like unary minus. `|` still merges dicts.
+def shl(x: int, n: int) -> int:
+    return x << n
+
+
+def popcount(x: int) -> int:
+    n = 0
+    v = x
+    while v:
+        n += v & 1
+        v >>= 1
+    return n
+
+
+def main() -> None:
+    print(1 << 40, shl(3, 4), -3 << 2, 5 >> 1, -5 >> 1, -1 >> 70)
+    print(6 & 3, -6 & 3, 6 | 3, 6 ^ 3, ~5, ~-1, -~5, ~~7)
+    print(1 | 2 ^ 3 & 4 << 1, 1 + 2 << 3, (1 + 2) << 3, 8 >> 1 + 1, 5 & 3 == 1)
+    print(1 << 2 * 3, ~1 + 1, -1 & 255 if False else 255 & -1)
+    x = 12
+    x &= 10
+    x |= 1
+    x ^= 3
+    x <<= 4
+    x >>= 2
+    print(x, popcount(255), popcount(1 << 40), popcount(0))
+    print({"a": 1} | {"b": 2})

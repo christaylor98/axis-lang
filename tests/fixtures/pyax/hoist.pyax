@@ -1,0 +1,20 @@
+# expect-exit: 0
+# pop() inside expressions and zip/enumerate over any expression, lifted where Python evaluates them once
+def main() -> None:
+    xs = [5, 3, 8, 1]
+    ys = [10, 20]
+    print(xs.pop(), "then", ys.pop() + 1)
+    if xs.pop() > 2:
+        print("big", xs)
+    total = 100 - ys.pop()
+    print(total, xs, ys)
+    print([a - b for a, b in zip(xs, xs[1:])])
+    for a, b in zip(sorted([3, 1, 2]), [9, 8, 7][::-1]):
+        print(a, b)
+    for i, w in enumerate("a b c".split(), 1):
+        print(i, w)
+    d = {"x": 1, "y": 2}
+    print([(i, k) for i, k in enumerate(list(d.keys()))])
+    stack = [1, 2, 3]
+    ok = stack.pop() == 3 and len(xs) == 2
+    print(ok)

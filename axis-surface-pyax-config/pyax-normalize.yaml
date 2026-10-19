@@ -1,0 +1,239 @@
+# PyAx Normalization Rules
+# Surface: surface-pyax (PYAX_SURFACE_EXPAND_V1)
+# Target NF Version: 0.1
+# Version: 0.1
+#
+# Runs AFTER expand (--expand pyax-expand.yaml), per top-level item. Expand has
+# already removed every operator, wrapper and statement form, so what reaches
+# here is a small, already-explicit tree:
+#
+#   FnDecl{name, params, return_type, body}
+#   Block{bindings: [AssignStmt], result}       -> nested LetExpr (as AI3's Body)
+#   IfStmt / Expr{condition, then_branch, orelse} -> IfExpr
+#   CallExpr{name, args: ArgList}, Name, IntLit, TextLit, BoolLit, NoneLit
+#   TypedParamList / TypedParam, NamedType      -> PrimTypeExpr
+#
+# The NF is the same NF AI3 produces; nf_lowering needs nothing new.
+# rule_order is explicit; a node with no matching rule is a hard error.
+
+version: "0.1"
+target_nf_version: "0.1"
+description: "PyAx normalization — expanded PyAx to the shared M1/AI3 NF"
+
+strategy:
+  application_order: "sequential"
+  traversal_order: "bottom_up"
+  default_behavior: "fail_loud"
+  failure_mode: "fail_loud"
+
+rule_order:
+  - "desugar_program"
+  - "desugar_fn_decl"
+  - "fold_block"
+  - "assign_to_let_binding"
+  - "if_stmt_to_if_expr"
+  - "cond_expr_to_if_expr"
+  - "desugar_call_expr"
+  - "normalize_arg_list"
+  - "name_to_var_ref"
+  - "normalize_int_lit"
+  - "normalize_text_lit"
+  - "normalize_bool_lit"
+  - "none_to_unit_lit"
+  - "keep_typed_param_list"
+  - "keep_typed_param"
+  - "named_type_to_prim_type"
+  - "normalize_empty"
+
+rules:
+
+  desugar_program:
+    description: "Program never reaches NF: the pipeline splits items first. Kept for a single-item file."
+    pattern:
+      node_kind: "Program"
+      fields:
+        items: { exists: true, is_list: true }
+    replacement:
+      nf_node: "unwrap_program_items"
+      nf_fields: "preserve_all"
+
+  desugar_fn_decl:
+    description: "FnDecl — pass through (name, params, return_type, body)"
+    pattern:
+      node_kind: "FnDecl"
+      fields:
+        name: { exists: true, is_token: true }
+        params: { exists: true, is_node: true }
+        body: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  fold_block:
+    description: "Block{bindings, result} → nested LetExpr, innermost body = result"
+    pattern:
+      node_kind: "Block"
+      fields:
+        result: { exists: true, is_node: true }
+    replacement:
+      nf_node: "fold_body_to_let_chain"
+      nf_fields: "preserve_all"
+
+  assign_to_let_binding:
+    description: "AssignStmt{name, value} → LetBinding (expand guarantees a new name)"
+    pattern:
+      node_kind: "AssignStmt"
+      fields:
+        name: { exists: true, is_token: true }
+        value: { exists: true, is_node: true }
+    replacement:
+      nf_node: "LetBinding"
+      nf_fields:
+        name: { from: "token:name" }
+        value: { from: "node:value" }
+
+  if_stmt_to_if_expr:
+    description: "IfStmt (expand gives it both branches as Blocks) → IfExpr"
+    pattern:
+      node_kind: "IfStmt"
+      fields:
+        condition: { exists: true, is_node: true }
+        then_branch: { exists: true, is_node: true }
+        orelse: { exists: true, is_node: true }
+    replacement:
+      nf_node: "IfExpr"
+      nf_fields:
+        condition: { from: "node:condition" }
+        then_branch: { from: "node:then_branch" }
+        else_branch: { from: "node:orelse" }
+
+  cond_expr_to_if_expr:
+    description: "`a if c else b` (expand's Expr{condition, then_branch, orelse}) → IfExpr"
+    pattern:
+      node_kind: "Expr"
+      fields:
+        condition: { exists: true, is_node: true }
+        then_branch: { exists: true, is_node: true }
+        orelse: { exists: true, is_node: true }
+    replacement:
+      nf_node: "IfExpr"
+      nf_fields:
+        condition: { from: "node:condition" }
+        then_branch: { from: "node:then_branch" }
+        else_branch: { from: "node:orelse" }
+
+  desugar_call_expr:
+    description: "CallExpr{name, args} — every call expand emitted, dispatched or as written"
+    pattern:
+      node_kind: "CallExpr"
+      fields:
+        name: { exists: true, is_token: true }
+        args: { exists: true, is_node: true }
+    replacement:
+      nf_node: "CallExpr"
+      nf_fields:
+        name: { from: "token:name" }
+        args: { from: "node:args" }
+
+  normalize_arg_list:
+    description: "ArgList — preserve args list"
+    pattern:
+      node_kind: "ArgList"
+      fields:
+        args: { exists: true, is_list: true }
+    replacement:
+      nf_node: "ArgList"
+      nf_fields:
+        args: { from: "nodes:args" }
+
+  name_to_var_ref:
+    description: "Name → VarRef (a local, a parameter, or a fn passed by name)"
+    pattern:
+      node_kind: "Name"
+      fields:
+        name: { exists: true, is_token: true }
+    replacement:
+      nf_node: "VarRef"
+      nf_fields:
+        name: { from: "token:name" }
+
+  normalize_int_lit:
+    description: "IntLit — token value (expand folds a leading `-` into the lexeme)"
+    pattern:
+      node_kind: "IntLit"
+      fields:
+        value: { exists: true, is_token: true }
+    replacement:
+      nf_node: "IntLit"
+      nf_fields:
+        value: { from: "token:value" }
+
+  normalize_text_lit:
+    description: "TextLit — token value, quotes included (lowering strips them)"
+    pattern:
+      node_kind: "TextLit"
+      fields:
+        value: { exists: true, is_token: true }
+    replacement:
+      nf_node: "TextLit"
+      nf_fields:
+        value: { from: "token:value" }
+
+  normalize_bool_lit:
+    description: "BoolLit — expand has canonicalised True/False to true/false"
+    pattern:
+      node_kind: "BoolLit"
+      fields:
+        value: { exists: true, is_token: true }
+    replacement:
+      nf_node: "BoolLit"
+      nf_fields:
+        value: { from: "token:value" }
+
+  none_to_unit_lit:
+    description: "None → UnitLit"
+    pattern:
+      node_kind: "NoneLit"
+    replacement:
+      nf_node: "UnitLit"
+      nf_fields: {}
+
+  keep_typed_param_list:
+    description: "TypedParamList — pass through"
+    pattern:
+      node_kind: "TypedParamList"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+
+  keep_typed_param:
+    description: "TypedParam{name, type_expr}"
+    pattern:
+      node_kind: "TypedParam"
+      fields:
+        name: { exists: true, is_token: true }
+        type_expr: { exists: true, is_node: true }
+    replacement:
+      nf_node: "TypedParam"
+      nf_fields:
+        name: { from: "token:name" }
+        type_expr: { from: "node:type_expr" }
+
+  named_type_to_prim_type:
+    description: "NamedType{name} (canonical after expand: Int, Text, IntList, ...) → PrimTypeExpr"
+    pattern:
+      node_kind: "NamedType"
+      fields:
+        name: { exists: true, is_token: true }
+    replacement:
+      nf_node: "PrimTypeExpr"
+      nf_fields:
+        name: { from: "token:name" }
+
+  normalize_empty:
+    description: "Empty — identity"
+    pattern:
+      node_kind: "Empty"
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}

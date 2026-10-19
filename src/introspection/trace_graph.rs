@@ -176,15 +176,8 @@ pub struct TraceGraph {
 }
 
 impl TraceGraph {
-    /// Create an empty trace graph
-    #[allow(dead_code)]
-    fn new() -> Self {
-        Self {
-            nodes: HashMap::new(),
-            links: Vec::new(),
-            core_ir_index: HashMap::new(),
-        }
-    }
+    // fn new() deleted Bundle 8 (2026-06-08): zero callers; TraceGraphBuilder::build() is the
+    // only constructor path.
 
     /// Get a trace node by ID
     pub fn get_node(&self, id: TraceNodeId) -> Option<&TraceNode> {

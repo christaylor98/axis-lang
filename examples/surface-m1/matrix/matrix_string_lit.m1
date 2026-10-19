@@ -1,0 +1,5 @@
+// Matrix fixture: STRING_LIT
+// String literal in body position.
+fn f() -> Text {
+  Text("hello")
+}

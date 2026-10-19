@@ -1,10 +1,10 @@
 // Wave 6: Spec-driven lexer tests
 // Tests load spec from fixture, lex samples, assert token sequences with spans
 
-use axis_lang_lab::frontend::lexer_engine::lex_with_spec;
-use axis_lang_lab::frontend::lexspec_load::load_spec;
-use axis_lang_lab::frontend::token::TokenKind;
-use axis_lang_lab::native_lex::{lex_file, lex_str};
+use axis_lang::frontend::lexer_engine::lex_with_spec;
+use axis_lang::frontend::lexspec_load::load_spec;
+use axis_lang::frontend::token::TokenKind;
+use axis_lang::native_lex::{lex_file, lex_str};
 use std::path::PathBuf;
 
 // Import invariant helper from wave6_invariants module

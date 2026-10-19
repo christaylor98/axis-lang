@@ -1,0 +1,3 @@
+// AI3 fixture: SEPARATORS — explicit semicolons, whole body on one line.
+// Must produce the same bundle as ai3_sep_newline.ai3 and ai3_sep_mixed.ai3.
+fn s(a: Int, b: Int) -> Int { let x = int_add(a, b); let y = int_mul(x, Int(2)); return int_sub(y, a); }

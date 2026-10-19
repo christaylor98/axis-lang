@@ -1,0 +1,15 @@
+// Gate fixture: multiple functions, one with multiple let-bindings.
+// Used by the m1_body_fold_multi_item gate test.
+//
+// make_pair: 2 let-bindings → Body folds to 2 nested LetExpr, innermost body = VarRef("x")
+// simple:    0 let-bindings → Body folds to just VarRef("flag")
+
+fn make_pair(a: Bool, b: Bool) -> Bool {
+  let x = a
+  let y = b
+  x
+}
+
+fn simple(flag: Bool) -> Bool {
+  flag
+}

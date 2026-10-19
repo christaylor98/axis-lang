@@ -1,7 +1,7 @@
 // Wave 1 Parser Spec Loader Integration Tests
 
-use axis_lang_lab::frontend::lexspec_load::load_spec as load_lexer_spec;
-use axis_lang_lab::frontend::parserspec_load::load_parser_spec;
+use axis_lang::frontend::lexspec_load::load_spec as load_lexer_spec;
+use axis_lang::frontend::parserspec_load::load_parser_spec;
 use std::path::Path;
 
 #[test]

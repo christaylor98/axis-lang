@@ -4,11 +4,12 @@
 pub mod cli_util;
 pub mod config;
 pub mod frontend;
-pub mod generated;
-pub use generated::axis_core_ir_0_3_capnp;
+pub mod fabric;
 pub mod ir;
 pub mod lowering;
-pub mod normalisation;
+// normalisation deleted in Bundle 4 (2026-06-08): Phase 3d legacy module
+// superseded by src/normalize/. validate_nf + NfValidationError migrated to
+// src/normalize/nf_validation.rs; pass_framework and desugaring retired.
 pub mod registry;
 pub mod spec;
 pub mod validation;
@@ -22,22 +23,14 @@ pub mod nf_ast;
 // Wave 6: Native lexer component (standalone, no pipeline deps)
 pub mod native_lex;
 
-// Wave 6: Codegen support
-pub mod codegen;
-
-// Wave 6: Execution substrate (Core IR interpreter)
+// Wave 6: Execution substrate (Core IR 0.3 interpreter retired in Phase 3d)
 pub mod execution;
-pub use execution::interpreter;
 
 // Wave A: End-to-end pipeline integration (specs → execution)
 pub mod pipeline;
 
 // Wave B: Introspection, traceability, and trust surfaces
 pub mod introspection;
-
-// Wave C: Manifest and sealing infrastructure
-pub mod manifest;
-pub mod sealed;
 
 // Wave 4: Compiler hook framework
 pub mod hooks;

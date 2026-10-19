@@ -1,0 +1,6 @@
+# expect-error: neg_pop_in_expr.pyax:5:14:
+# expect-error: can't be part of a larger expression here
+def main(args: list[str]) -> int:
+    xs = [1, 2]
+    print(xs.pop() if len(args) > 0 else 0)
+    return 0

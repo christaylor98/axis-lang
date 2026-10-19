@@ -1,0 +1,5 @@
+# expect-error: both sides of `... if ... else ...` must have one type
+# int on one side, str on the other
+def main(args: list[str]) -> None:
+    n = len(args)
+    print(n if n > 0 else "none")

@@ -1,0 +1,46 @@
+# expect-exit: 0
+# for / range / while / nested loops / rebinding / aug-assign
+def sum_to(n: int) -> int:
+    total = 0
+    for i in range(1, n + 1):
+        total += i
+    return total
+
+
+def collatz_steps(n: int) -> int:
+    steps = 0
+    while n != 1:
+        if n % 2 == 0:
+            n = n // 2
+        else:
+            n = 3 * n + 1
+        steps += 1
+    return steps
+
+
+def table(n: int) -> int:
+    count = 0
+    for i in range(n):
+        for j in range(i):
+            count = count + i * j
+    return count
+
+
+def countdown(n: int) -> str:
+    out = ""
+    for i in range(n, 0, -1):
+        out = out + str(i) + " "
+    return out + "go"
+
+
+def main(args: list[str]) -> int:
+    print(str(sum_to(100)))
+    print(str(collatz_steps(27)))
+    print(str(table(10)))
+    print(countdown(5))
+    x = 10
+    x -= 3
+    x *= 2
+    x //= 3
+    x %= 3
+    return x

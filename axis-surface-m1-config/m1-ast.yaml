@@ -1,0 +1,188 @@
+# M1 (Mechanical 1) AST Schema
+# Surface: surface-m1
+# Version: 0.1
+#
+# Governed by: AXLANG_TYPE_SYSTEM_V2
+# Child indices count ALL children including tokens, 0-based.
+
+nodes:
+
+  Program:
+    fields:
+      items:
+        from: children(0..)
+
+  Item:
+    fields:
+      variant:
+        from: child(0)
+
+  # fn name(params) -> return_type { body }
+  FnDecl:
+    fields:
+      name:
+        from: token(IDENT)
+      params:
+        from: child(3)        # TypedParamList
+      return_type:
+        from: child(6)        # TypeExpr (after PUNCT_->)
+      body:
+        from: child(8)        # Body (after PUNCT_{)
+
+  LetDecl:
+    fields:
+      name:
+        from: token(IDENT)
+      value:
+        from: child(3)   # Expr (after KW_LET IDENT PUNCT_=)
+
+  # ── TYPED PARAMS ─────────────────────────────────────────────
+
+  TypedParamList:
+    fields:
+      params:
+        from: children(0..)
+
+  TypedParamRest:
+    fields:
+      param:
+        from: child(1)
+
+  TypedParam:
+    fields:
+      name:
+        from: token(IDENT)
+      type_expr:
+        from: child(2)
+
+  # ── TYPE EXPRESSIONS ─────────────────────────────────────────
+
+  TypeExpr:
+    fields:
+      variant:
+        from: child(0)
+
+  # Value(T1, T2, T3) — compound constructor tag (max arity 3)
+  ValueTypeExpr:
+    fields:
+      type_args:
+        from: children_excluding_last(2)  # TypeExpr + TypeExprRest*, excludes trailing PUNCT_)
+
+  TypeExprRest:
+    fields:
+      type_expr:
+        from: child(1)
+
+  # ValueList(T) — list constructor tag
+  ValueListTypeExpr:
+    fields:
+      element_type:
+        from: child(2)        # inner TypeExpr
+
+  # Int | Text | Bool | Unit | user-defined
+  PrimTypeExpr:
+    fields:
+      name:
+        from: first_token
+
+  # ── BODY ─────────────────────────────────────────────────────
+
+  Body:
+    fields:
+      bindings:
+        from: children_excluding_last(0)  # all LetBindings except final Expr
+      result:
+        from: last_child                  # final expression
+
+  LetBinding:
+    fields:
+      name:
+        from: token(IDENT)
+      value:
+        from: child(3)   # Expr (after KW_LET IDENT PUNCT_=)
+
+  # ── EXPRESSIONS ──────────────────────────────────────────────
+
+  Expr:
+    fields:
+      variant:
+        from: child(0)
+
+  # if cond { then } else { else }
+  IfExpr:
+    fields:
+      condition:
+        from: child(1)
+      then_branch:
+        from: child(3)
+      else_branch:
+        from: child(7)
+
+  # ValueTypeArgs wraps TypeExpr TypeExprRest* for fixed indexing
+  ValueTypeArgs:
+    fields:
+      types:
+        from: children(0..)   # TypeExpr + TypeExprRest*
+
+  # Value(T1, T2)(e1, e2) — type tag + args
+  # Grammar: <KW_VALUE> <PUNCT_(> ValueTypeArgs <PUNCT_)> <PUNCT_(> ArgList <PUNCT_)>
+  # child(2)=ValueTypeArgs  child(5)=ArgList
+  ValueConstructExpr:
+    fields:
+      type_args:
+        from: child(2)   # ValueTypeArgs node
+      args:
+        from: child(5)   # ArgList inside second parens
+
+  # ValueList(T)(e1, e2, ...) or ValueList(T)[e1, e2, ...]
+  ValueListConstructExpr:
+    fields:
+      element_type:
+        from: child(2)          # inner TypeExpr
+      args:
+        from: child(5)          # ArgList
+
+  # name(args)
+  CallExpr:
+    fields:
+      name:
+        from: token(IDENT)
+      args:
+        from: child(2)
+
+  ArgList:
+    fields:
+      args:
+        from: children(0..)
+
+  ArgListRest:
+    fields:
+      arg:
+        from: child(1)
+
+  # ── LITERALS ─────────────────────────────────────────────────
+
+  # determine — zero-operand discharge gate; lowers to CDeterminate.
+  DetermineExpr:
+    fields: {}
+
+  IntLit:
+    fields:
+      value:
+        from: token(INT_LIT)
+
+  TextLit:
+    fields:
+      value:
+        from: token(STRING_LIT)
+
+  BoolLit:
+    fields:
+      value:
+        from: child_token(2)
+
+  UnitLit:
+    fields: {}
+
+  Empty:
+    fields: {}

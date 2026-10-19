@@ -1,0 +1,38 @@
+def first_over(xs: ValueList, limit: Int) -> Int:
+    total = 0
+    count = 0
+    __done = False
+    __ret = 0
+    __st_12 = fold(xs, value_make(count, total, limit, __done, __ret), __first_over_loop1)
+    __count_13 = value_to_int(ctor_field(__st_12, 0))
+    __total_14 = value_to_int(ctor_field(__st_12, 1))
+    __limit_15 = value_to_int(ctor_field(__st_12, 2))
+    __done_16 = value_to_bool(ctor_field(__st_12, 3))
+    __ret_17 = value_to_int(ctor_field(__st_12, 4))
+    if __done_16:
+        return __ret_17
+    else:
+        return -1
+
+def __first_over_loop1(__acc: Value, __item: Value) -> Value:
+    __count_2 = value_to_int(ctor_field(__acc, 0))
+    __total_3 = value_to_int(ctor_field(__acc, 1))
+    __limit_4 = value_to_int(ctor_field(__acc, 2))
+    __done_5 = value_to_bool(ctor_field(__acc, 3))
+    __ret_6 = value_to_int(ctor_field(__acc, 4))
+    __x_7 = value_to_int(__item)
+    if __done_5:
+        return __acc
+    else:
+        __total_8 = int_add(__total_3, __x_7)
+        __count_9 = int_add(__count_2, 1)
+        if int_gt(__total_8, __limit_4):
+            __ret_10 = __count_9
+            __done_11 = True
+            return value_make(__count_9, __total_8, __limit_4, __done_11, __ret_10)
+        else:
+            return value_make(__count_9, __total_8, __limit_4, __done_5, __ret_6)
+
+def pyax_main(args: ValueList) -> Int:
+    return first_over(list_make(3, 4, 5, 6), 10)
+

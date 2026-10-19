@@ -1,0 +1,9 @@
+# expect-error: neg_map.pyax:8:10:
+# expect-error: map() is not in PyAx
+def double(x: int) -> int:
+    return x * 2
+
+
+def main(args: list[str]) -> int:
+    ys = map(double, [1, 2, 3])
+    return 0

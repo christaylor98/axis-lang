@@ -1,0 +1,469 @@
+# PyAx Parser Specification
+# Surface: surface-pyax (PYAX_SURFACE_EXPAND_V1)
+# Version: 0.1
+#
+# parser_runtime.rs is an ordered-choice backtracking parser with no memo and
+# no left-recursion guard. So:
+#   * every precedence level is `Level LevelRest*` — terminal-anchored, never
+#     left-recursive;
+#   * an optional tail is `?`/`*` on its own rule (CondTail, ElseTail), never a
+#     second production that re-parses the same prefix: re-parsing doubles the
+#     work at each nesting level;
+#   * every rule keeps fixed child positions, so pyax-ast.yaml can index them.
+#     Where something is optional, the rule has an `Empty` alternative or the
+#     schema reads it with an open range `children(n..)`.
+#
+# Phase 2: def, if/elif/else, for, while, return, pass, assignment and
+# rebinding (`=`, `+=`...), `xs[i] = v`, expression statements, Python
+# operators, calls, method calls, indexing, list literals, comprehensions and
+# generator arguments (`sum(x for x in xs)`). `break` / `continue` parse so
+# that expand can say why they are not in PyAx.
+# 2b: tuples (`(a, b)`, `return a, b`, `a, b = ...`), dicts (`{k: v}`,
+# `d[k] += 1`, `del d[k]`), slices, f-strings, single-quoted strings.
+
+parser:
+  start: Program
+
+  grammar:
+
+    Program:
+      - Item*
+
+    Item:
+      - FnDecl
+      - ImportStmt
+      - ConstDecl
+      - ModuleDoc
+
+    # A module docstring: no effect.
+    ModuleDoc:
+      - <STRING_LIT> <PUNCT_NEWLINE>
+
+    # Module-level constants: `LIMIT = 100` (expand inlines them where used).
+    ConstDecl:
+      - AnnAssignStmt
+      - AssignStmt
+
+    # `from typing import List, Dict` — accepted and ignored (pyax-expand.yaml
+    # `ignored_imports`); any other import is refused by expand.
+    ImportStmt:
+      - <KW_FROM> <IDENT> <KW_IMPORT> ImportNames <PUNCT_NEWLINE>
+      - <KW_IMPORT> <IDENT> <PUNCT_NEWLINE>
+
+    ImportNames:
+      - <IDENT> ImportRest*
+
+    ImportRest:
+      - <PUNCT_,> <IDENT>
+
+    # def name(params) -> T:  NEWLINE INDENT Block DEDENT
+    FnDecl:
+      - <KW_DEF> <IDENT> <PUNCT_(> TypedParamList <PUNCT_)> RetAnn <PUNCT_:> <PUNCT_NEWLINE> <PUNCT_INDENT> Block <PUNCT_DEDENT>
+
+    TypedParamList:
+      - TypedParam TypedParamRest*
+      - Empty
+
+    TypedParamRest:
+      - <PUNCT_,> TypedParam
+
+    # `width: int = 6` — a default, filled in at call sites that omit it
+    TypedParam:
+      - <IDENT> <PUNCT_:> TypeExpr ParamDefault?
+
+    ParamDefault:
+      - <PUNCT_=> Expr
+
+    RetAnn:
+      - <"PUNCT_->"> TypeExpr
+      - Empty
+
+    # ── TYPES ────────────────────────────────────────────────────
+
+    TypeExpr:
+      - GenericType
+      - NamedType
+
+    GenericType:
+      - <IDENT> <PUNCT_[> TypeExpr TypeRest* <PUNCT_]>
+
+    TypeRest:
+      - <PUNCT_,> TypeExpr
+
+    NamedType:
+      - <IDENT>
+      - <KW_NONE>
+
+    # ── STATEMENTS ───────────────────────────────────────────────
+
+    Block:
+      - Stmt+
+
+    Stmt:
+      - ReturnStmt
+      - PassStmt
+      - BreakStmt
+      - ContinueStmt
+      - IfStmt
+      - ForStmt
+      - WhileStmt
+      - RaiseStmt
+      - AssertStmt
+      - DelStmt
+      - AnnAssignStmt
+      - TupleAssignStmt
+      - AugAssignStmt
+      - AugSubAssignStmt
+      - SubAssignStmt
+      - AssignStmt
+      - ExprStmt
+      - FnDecl
+
+    # `return a, b` returns a tuple; a bare `return` returns None.
+    ReturnStmt:
+      - <KW_RETURN> ExprList <PUNCT_NEWLINE>
+      - <KW_RETURN> <PUNCT_NEWLINE>
+
+    # raise ValueError("why") — aborts the program, as an uncaught exception does
+    RaiseStmt:
+      - <KW_RAISE> Expr <PUNCT_NEWLINE>
+
+    # assert cond  /  assert cond, "why"
+    AssertStmt:
+      - <KW_ASSERT> Expr AssertMsg? <PUNCT_NEWLINE>
+
+    AssertMsg:
+      - <PUNCT_,> Expr
+
+    # del d[k]  /  del xs[i]
+    DelStmt:
+      - <KW_DEL> <IDENT> <PUNCT_[> Expr <PUNCT_]> <PUNCT_NEWLINE>
+
+    # a, b = ...   (2 to 4 names)
+    TupleAssignStmt:
+      - TargetList <PUNCT_=> ExprList <PUNCT_NEWLINE>
+
+    TargetList:
+      - <IDENT> <PUNCT_,> <IDENT> <PUNCT_,> <IDENT> <PUNCT_,> <IDENT>
+      - <IDENT> <PUNCT_,> <IDENT> <PUNCT_,> <IDENT>
+      - <IDENT> <PUNCT_,> <IDENT>
+
+    PassStmt:
+      - <KW_PASS> <PUNCT_NEWLINE>
+
+    BreakStmt:
+      - <KW_BREAK> <PUNCT_NEWLINE>
+
+    ContinueStmt:
+      - <KW_CONTINUE> <PUNCT_NEWLINE>
+
+    # for x in xs:  /  for i, x in enumerate(xs):
+    ForStmt:
+      - <KW_FOR> ForTarget <KW_IN> Expr <PUNCT_:> <PUNCT_NEWLINE> <PUNCT_INDENT> Block <PUNCT_DEDENT>
+
+    ForTarget:
+      - <IDENT> <PUNCT_,> <IDENT> <PUNCT_,> <IDENT>
+      - <IDENT> <PUNCT_,> <IDENT>
+      - <IDENT>
+
+    WhileStmt:
+      - <KW_WHILE> Expr <PUNCT_:> <PUNCT_NEWLINE> <PUNCT_INDENT> Block <PUNCT_DEDENT>
+
+    IfStmt:
+      - <KW_IF> Expr <PUNCT_:> <PUNCT_NEWLINE> <PUNCT_INDENT> Block <PUNCT_DEDENT> ElseTail
+
+    ElifClause:
+      - <KW_ELIF> Expr <PUNCT_:> <PUNCT_NEWLINE> <PUNCT_INDENT> Block <PUNCT_DEDENT> ElseTail
+
+    ElseTail:
+      - ElifClause
+      - ElseClause
+      - Empty
+
+    ElseClause:
+      - <KW_ELSE> <PUNCT_:> <PUNCT_NEWLINE> <PUNCT_INDENT> Block <PUNCT_DEDENT>
+
+    AnnAssignStmt:
+      - <IDENT> <PUNCT_:> TypeExpr <PUNCT_=> ExprList <PUNCT_NEWLINE>
+
+    AugAssignStmt:
+      - <IDENT> <"PUNCT_+="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_-="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_*="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_//="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_/="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_%="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_|="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_&="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_^="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_<<="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <"PUNCT_>>="> Expr <PUNCT_NEWLINE>
+
+    # d[k] += v
+    AugSubAssignStmt:
+      - <IDENT> <PUNCT_[> Expr <PUNCT_]> <"PUNCT_+="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <PUNCT_[> Expr <PUNCT_]> <"PUNCT_-="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <PUNCT_[> Expr <PUNCT_]> <"PUNCT_*="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <PUNCT_[> Expr <PUNCT_]> <"PUNCT_//="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <PUNCT_[> Expr <PUNCT_]> <"PUNCT_/="> Expr <PUNCT_NEWLINE>
+      - <IDENT> <PUNCT_[> Expr <PUNCT_]> <"PUNCT_%="> Expr <PUNCT_NEWLINE>
+
+    # xs[i] = v  /  d[k] = v
+    SubAssignStmt:
+      - <IDENT> <PUNCT_[> Expr <PUNCT_]> <PUNCT_=> Expr <PUNCT_NEWLINE>
+
+    AssignStmt:
+      - <IDENT> <PUNCT_=> ExprList <PUNCT_NEWLINE>
+
+    ExprStmt:
+      - Expr <PUNCT_NEWLINE>
+
+    # ── EXPRESSIONS (loosest first) ──────────────────────────────
+
+    # `a` or a tuple `a, b` (a trailing comma makes a 1-tuple)
+    ExprList:
+      - Expr TupleRest*
+
+    TupleRest:
+      - <PUNCT_,> Expr
+      - <PUNCT_,>
+
+    # value if condition else other
+    Expr:
+      - OrExpr CondTail?
+
+    CondTail:
+      - <KW_IF> OrExpr <KW_ELSE> Expr
+
+    OrExpr:
+      - AndExpr OrRest*
+
+    OrRest:
+      - <KW_OR> AndExpr
+
+    AndExpr:
+      - NotExpr AndRest*
+
+    AndRest:
+      - <KW_AND> NotExpr
+
+    NotExpr:
+      - NotOp
+      - Comparison
+
+    NotOp:
+      - <KW_NOT> NotExpr
+
+    Comparison:
+      - BitOr CmpRest*
+
+    # `not in` is the only two-token operator; its operand is the last child.
+    CmpRest:
+      - <"PUNCT_=="> BitOr
+      - <"PUNCT_!="> BitOr
+      - <"PUNCT_<="> BitOr
+      - <"PUNCT_>="> BitOr
+      - <"PUNCT_<"> BitOr
+      - <"PUNCT_>"> BitOr
+      - <KW_IN> BitOr
+      - <KW_NOT> <KW_IN> BitOr
+
+    # Python's order, loosest first: `|` (also dict merge), `^`, `&`, `<<` `>>`, then `+` (INT_BIT_OPS_V1)
+    BitOr:
+      - BitXor BitOrRest*
+
+    BitOrRest:
+      - <"PUNCT_|"> BitXor
+
+    BitXor:
+      - BitAnd BitXorRest*
+
+    BitXorRest:
+      - <"PUNCT_^"> BitAnd
+
+    BitAnd:
+      - Shift BitAndRest*
+
+    BitAndRest:
+      - <"PUNCT_&"> Shift
+
+    Shift:
+      - Sum ShiftRest*
+
+    ShiftRest:
+      - <"PUNCT_<<"> Sum
+      - <"PUNCT_>>"> Sum
+
+    Sum:
+      - Term SumRest*
+
+    SumRest:
+      - <"PUNCT_+"> Term
+      - <"PUNCT_-"> Term
+
+    Term:
+      - Factor TermRest*
+
+    TermRest:
+      - <"PUNCT_*"> Factor
+      - <"PUNCT_//"> Factor
+      - <"PUNCT_/"> Factor
+      - <"PUNCT_%"> Factor
+
+    # `**` binds tighter than unary minus and is right-associative:
+    # -2 ** 2 == -(2 ** 2), 2 ** 3 ** 2 == 2 ** 9.
+    Factor:
+      - NegOp
+      - InvOp
+      - Power
+
+    NegOp:
+      - <"PUNCT_-"> Factor
+
+    # `~x`, at unary minus's level (INT_BIT_OPS_V1)
+    InvOp:
+      - <"PUNCT_~"> Factor
+
+    Power:
+      - Postfix PowRest?
+
+    PowRest:
+      - <"PUNCT_**"> Factor
+
+    Postfix:
+      - Atom Trailer*
+
+    Trailer:
+      - CallTrailer
+      - MethodTrailer
+      - AttrTrailer
+      - SliceTrailer
+      - IndexTrailer
+
+    # `math.pi` — module constants only (expand refuses any other attribute)
+    AttrTrailer:
+      - <PUNCT_.> <IDENT>
+
+    # A generator argument re-parses its first expression; only `f(x for ...)`
+    # pays that, never an ordinary call.
+    CallTrailer:
+      - <PUNCT_(> ArgList <PUNCT_)>
+      - <PUNCT_(> GenExpr <PUNCT_)>
+
+    MethodTrailer:
+      - <PUNCT_.> <IDENT> <PUNCT_(> ArgList <PUNCT_)>
+      - <PUNCT_.> <IDENT> <PUNCT_(> GenExpr <PUNCT_)>
+
+    # xs[lo:hi]  /  xs[lo:hi:step]  — either bound may be omitted
+    SliceTrailer:
+      - <PUNCT_[> SliceBound <PUNCT_:> SliceBound SliceStep? <PUNCT_]>
+
+    SliceBound:
+      - Expr
+      - Empty
+
+    SliceStep:
+      - <PUNCT_:> SliceBound
+
+    IndexTrailer:
+      - <PUNCT_[> Expr <PUNCT_]>
+
+    Atom:
+      - FString
+      - FloatLit
+      - IntLit
+      - TextLit
+      - BoolLit
+      - NoneLit
+      - Name
+      - ParenExpr
+      - DictComp
+      - DictLit
+      - ListComp
+      - ListLit
+
+    FloatLit:
+      - <FLOAT_LIT>
+
+    IntLit:
+      - <INT_LIT>
+
+    TextLit:
+      - <STRING_LIT>
+
+    BoolLit:
+      - <KW_TRUE>
+      - <KW_FALSE>
+
+    NoneLit:
+      - <KW_NONE>
+
+    Name:
+      - <IDENT>
+
+    # `(a)`, or the tuple `(a, b)`
+    ParenExpr:
+      - <PUNCT_(> ExprList <PUNCT_)>
+
+    # {k: v for x in xs if cond}
+    DictComp:
+      - <PUNCT_{> Expr <PUNCT_:> Expr <KW_FOR> ForTarget <KW_IN> OrExpr CompIf? <PUNCT_}>
+
+    DictLit:
+      - <PUNCT_{> DictItem DictRest* <PUNCT_}>
+      - <PUNCT_{> <PUNCT_}>
+
+    DictItem:
+      - DictSpread
+      - Expr <PUNCT_:> Expr
+
+    # {**other, k: v}
+    DictSpread:
+      - <"PUNCT_**"> Expr
+
+    DictRest:
+      - <PUNCT_,> DictItem
+      - <PUNCT_,>
+
+    # f"text{expr}text" — the lexer splits it (pyax-lexer.yaml `interpolation`)
+    FString:
+      - <PUNCT_FSTR_BEGIN> FPart* <PUNCT_FSTR_END>
+
+    FPart:
+      - TextLit
+      - FExpr
+
+    FExpr:
+      - <PUNCT_FSTR_OPEN> Expr <PUNCT_FSTR_CLOSE>
+
+    ListLit:
+      - <PUNCT_[> ArgList <PUNCT_]>
+
+    # [elem for x in xs if cond] — the iterable is an OrExpr, as in Python,
+    # so `if` after it starts the filter rather than a conditional expression.
+    ListComp:
+      - <PUNCT_[> Expr <KW_FOR> ForTarget <KW_IN> OrExpr CompIf? <PUNCT_]>
+
+    GenExpr:
+      - Expr <KW_FOR> ForTarget <KW_IN> OrExpr CompIf?
+
+    CompIf:
+      - <KW_IF> OrExpr
+
+    ArgList:
+      - Arg ArgRest*
+      - Empty
+
+    ArgRest:
+      - <PUNCT_,> Arg
+
+    # `name=value` (keyword argument) or a plain argument
+    Arg:
+      - KwArg
+      - Expr
+
+    KwArg:
+      - <IDENT> <PUNCT_=> Expr
+
+    Empty:
+      -

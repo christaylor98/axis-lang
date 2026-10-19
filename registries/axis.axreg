@@ -1,0 +1,163 @@
+// Axis compiler primitives registry.
+//
+// Identities: §5b bootstrap rule — SHA-256 of the UTF-8 function name bytes.
+// This is the scope-limited exception for stable-named compiler primitives;
+// new user-defined functions MUST use entropy-minted identities instead.
+//
+// Two projections of this file that differ only in comments, whitespace, or
+// field ordering MUST lower to identical canonical bytes (Format §8).
+
+registry axis 0.5
+
+// ─────────── types ───────────
+type Unit  = prim unit
+type Bool  = prim bool
+type Int   = prim int
+type Text  = prim text
+
+// ─────────── unit operations ───────────
+// unit_id: identity function on unit — §5b identity = SHA-256("unit_id")
+fn unit_id
+  identity 0x59e4aa5d01ba2b0703da58b5c1ae1b36717cbdb80a357687abe1665f759cf4cf
+  kind leaf
+  in (Unit)
+  out Unit
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// seq_unit: sequence two unit values — §5b identity = SHA-256("seq_unit")
+fn seq_unit
+  identity 0x99920a1c7a9ff7704d937b8833615de207765eb642792f0f0788cb31434e3bc6
+  kind leaf
+  in (Unit, Unit)
+  out Unit
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// ─────────── boolean operations ───────────
+// bool_not: logical not — §5b identity = SHA-256("bool_not")
+fn bool_not
+  identity 0x532c5da578d56c6a6d421546e8e82143060e8613c40542ecbd88b8d9eddea3ca
+  kind leaf
+  in (Bool)
+  out Bool
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// bool_and: logical and — §5b identity = SHA-256("bool_and")
+fn bool_and
+  identity 0x8f328d52927e5dc1e696f9416bce59b7148abd9147fbe834831048fa95e81bc4
+  kind leaf
+  in (Bool, Bool)
+  out Bool
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// bool_or: logical or — §5b identity = SHA-256("bool_or")
+fn bool_or
+  identity 0xda958f6a6dcf73289af2745cfe46d0138d88dbef9108887b3c5804d89135fdb1
+  kind leaf
+  in (Bool, Bool)
+  out Bool
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// ─────────── integer arithmetic ───────────
+// int_add: integer addition — §5b identity = SHA-256("int_add")
+fn int_add
+  identity 0xe75ea99b4ee3797ecd1dbc78deed3baa952651bcae06d74458068fa4c5395ed0
+  kind leaf
+  in (Int, Int)
+  out Int
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// int_sub: integer subtraction — §5b identity = SHA-256("int_sub")
+fn int_sub
+  identity 0xfe3ddb31aca60ca0e7b71a15f2da4571867d21e3e5589101f93e896d3d517407
+  kind leaf
+  in (Int, Int)
+  out Int
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// int_mul: integer multiplication — §5b identity = SHA-256("int_mul")
+fn int_mul
+  identity 0x3e51117b81c503ccb2e030bd9a2893c9b6b72a6c7128576312a91e5d48a6a61a
+  kind leaf
+  in (Int, Int)
+  out Int
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// ─────────── integer comparisons ───────────
+// int_eq: integer equality — §5b identity = SHA-256("int_eq")
+fn int_eq
+  identity 0xc8ee24d1f0bdebc7a2d7c88c5f2538075a0bfd35358f4dcaafdab1d12c1c4b93
+  kind leaf
+  in (Int, Int)
+  out Bool
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// int_lt: integer less-than — §5b identity = SHA-256("int_lt")
+fn int_lt
+  identity 0x297e451d4eba2d6ba1477d480a9924409c16410464a35c824172fafc887bb7b3
+  kind leaf
+  in (Int, Int)
+  out Bool
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// ─────────── value construction primitives ───────────
+//
+// value_make / list_make are type-erased compiler primitives.
+// Surface type tags (Value(T1,...,Tn) / ValueList(T)) are checked before lowering;
+// the IR carries no tag. Declared arity 0 — actual call-site arity is unbounded
+// and enforced at the surface. §5b bootstrap identities.
+//
+// The registry format (fixed-arity FnGenesis) cannot express unbounded typed
+// construction; these entries are intentionally under-specified here.
+// Type checking is fully discharged at the surface before lowering reaches these.
+
+// value_make: §5b identity = SHA-256("value_make")
+fn value_make
+  identity 0xf334e7070de9e3c1d96b5b5bf067a3cbe9ad00697911f1427626455d82242aee
+  kind leaf
+  in ()
+  out Unit
+  effect pure
+  deterministic true
+  idempotent true
+end
+
+// list_make: §5b identity = SHA-256("list_make")
+fn list_make
+  identity 0x5a4f0bc00a7694307c987e5053c11d14e381d49b2996c97ac3b206527e3ed26e
+  kind leaf
+  in ()
+  out Unit
+  effect pure
+  deterministic true
+  idempotent true
+end

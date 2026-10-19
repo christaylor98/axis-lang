@@ -32,7 +32,7 @@ rule_order:
   - "desugar_block"
   - "desugar_block_content"
   - "desugar_stmt"
-  - "desugar_let_stmt"
+  - "desugar_assign_stmt"
   - "desugar_expr_stmt"
   
   # Third: desugar control flow
@@ -42,11 +42,29 @@ rule_order:
   - "desugar_while_expr"
   - "desugar_loop_expr"
   
-  # Fourth: handle expression variants
+  # Fourth: handle expression variants and expression hierarchy wrappers
   - "unwrap_expr_variant"
-  
-  # Fifth: identity rules for NF-compliant nodes
-  - "identity_literals"
+  - "unwrap_equality_expr"
+  - "unwrap_rel_expr"
+  - "unwrap_add_expr"
+  - "unwrap_mul_expr"
+  - "unwrap_unary_expr"
+  - "unwrap_call_expr"
+  - "unwrap_primary"
+  - "normalize_primary_ident"
+
+  # Fifth: pass-through structural nodes that are discarded by parent rules
+  - "normalize_empty"
+  - "normalize_param_list"
+  - "normalize_param_rest"
+  - "normalize_param"
+  - "normalize_arg_list"
+  - "normalize_arg_list_rest"
+  - "normalize_call_suffix"
+
+  # Sixth: identity rules for NF-compliant nodes
+  - "identity_typed_literals"
+  - "identity_constructors"
   - "identity_variables"
   - "identity_let_expr"
   - "identity_lam_expr"
@@ -86,24 +104,18 @@ rules:
     constraints: []
 
   desugar_fn_decl:
-    description: "Desugar FnDecl to lambda expression"
+    description: "Unwrap FnDecl to its body expression (function structure dropped at IR level)"
     pattern:
       node_kind: "FnDecl"
       fields:
-        name: { exists: true, is_token: true }
-        params: { exists: true, is_node: true }
         body: { exists: true, is_node: true }
     replacement:
-      nf_node: "curry_lambda_from_params"
+      nf_node: "transparent"
       nf_fields:
-        params: { from: "node:params" }
         body: { from: "node:body", recurse: true }
-      strategy: "build_curried_lambda_chain"
-    constraints:
-      - "params must be ParamList"
-      - "body must normalize to NF expression"
+    constraints: []
     notes:
-      - "fn f(x, y) { body } → lam(x, lam(y, body))"
+      - "FnDecl is transparent at Core IR level — only the body expression is lowered"
 
   # ═══════════════════════════════════════════════════════════════════════
   # BLOCK AND STATEMENT DESUGARING
@@ -122,21 +134,21 @@ rules:
     constraints: []
 
   desugar_block_content:
-    description: "Desugar BlockContent (statements) to nested LetExpr"
+    description: "Fold BlockContent items (AssignStmt chain + final Expr) into nested LetExpr"
     pattern:
       node_kind: "BlockContent"
       fields:
-        stmts: { exists: true, is_list: true }
+        items: { exists: true, is_list: true }
     replacement:
-      nf_node: "nest_statements_as_let"
-      nf_fields:
-        stmts: { from: "nodes:stmts", recurse: true }
-      strategy: "right_to_left_nesting"
+      nf_node: "fold_stmts_to_let_chain"
+      nf_fields: {}
     constraints:
-      - "at least one statement must exist"
+      - "last item must be an expression (not an AssignStmt)"
+      - "preceding items must be AssignStmt (desugared to LetBinding by the time this rule fires)"
     notes:
-      - "{ s1; s2; expr } → let _tmp1 = s1 in let _tmp2 = s2 in expr"
-      - "Last statement becomes body of innermost let"
+      - "Bottom-up: children are normalized before BlockContent. AssignStmts become LetBindings first."
+      - "Strategy folds right-to-left: LetExpr(n1,v1, LetExpr(n2,v2, ... body))"
+      - "Single-expression block (0 assignments): returns the expression directly"
 
   desugar_stmt:
     description: "Unwrap Stmt variant to access inner statement"
@@ -150,22 +162,23 @@ rules:
         variant: { from: "node:variant", recurse: true }
     constraints: []
 
-  desugar_let_stmt:
-    description: "Convert LetStmt to LetExpr (simplified - body from context)"
+  desugar_assign_stmt:
+    description: "Convert AssignStmt to LetBinding intermediate node (body supplied by BlockContent fold)"
     pattern:
-      node_kind: "LetStmt"
+      node_kind: "AssignStmt"
       fields:
         name: { exists: true, is_token: true }
         value: { exists: true, is_node: true }
     replacement:
-      nf_node: "LetExpr"
-      nf_fields: "extract_from_block_context"
-      strategy: "extract_body_from_block_context"
+      nf_node: "LetBinding"
+      nf_fields:
+        name: { from: "token:name" }
+        value: { from: "node:value", recurse: true }
     constraints:
       - "value must normalize"
     notes:
-      - "LetStmt requires surrounding BlockContent to provide body"
-      - "This is handled by desugar_block_content"
+      - "LetBinding is an intermediate NF node consumed by fold_stmts_to_let_chain"
+      - "The fold in desugar_block_content chains LetBindings into nested LetExprs"
 
   desugar_expr_stmt:
     description: "Unwrap ExprStmt to access expression"
@@ -292,18 +305,213 @@ rules:
         variant: { from: "node:variant", recurse: true }
     constraints: []
 
+  # ─── Binary expression wrappers (transparent when no ops) ───────────────
+
+  unwrap_equality_expr:
+    description: "Unwrap EqualityExpr to its left operand (no ops case)"
+    pattern:
+      node_kind: "EqualityExpr"
+      fields:
+        left: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields:
+        left: { from: "node:left", recurse: true }
+    constraints: []
+
+  unwrap_rel_expr:
+    description: "Unwrap RelExpr to its left operand (no ops case)"
+    pattern:
+      node_kind: "RelExpr"
+      fields:
+        left: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields:
+        left: { from: "node:left", recurse: true }
+    constraints: []
+
+  unwrap_add_expr:
+    description: "Unwrap AddExpr to its left operand (no ops case)"
+    pattern:
+      node_kind: "AddExpr"
+      fields:
+        left: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields:
+        left: { from: "node:left", recurse: true }
+    constraints: []
+
+  unwrap_mul_expr:
+    description: "Unwrap MulExpr to its left operand (no ops case)"
+    pattern:
+      node_kind: "MulExpr"
+      fields:
+        left: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields:
+        left: { from: "node:left", recurse: true }
+    constraints: []
+
+  unwrap_unary_expr:
+    description: "Unwrap UnaryExpr variant wrapper"
+    pattern:
+      node_kind: "UnaryExpr"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields:
+        variant: { from: "node:variant", recurse: true }
+    constraints: []
+
+  unwrap_call_expr:
+    description: "Unwrap CallExpr to target (no suffixes case)"
+    pattern:
+      node_kind: "CallExpr"
+      fields:
+        target: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields:
+        target: { from: "node:target", recurse: true }
+    constraints: []
+
+  unwrap_primary:
+    description: "Unwrap Primary variant wrapper (when variant is a node)"
+    pattern:
+      node_kind: "Primary"
+      fields:
+        variant: { exists: true, is_node: true }
+    replacement:
+      nf_node: "transparent"
+      nf_fields:
+        variant: { from: "node:variant", recurse: true }
+    constraints: []
+
+  normalize_primary_ident:
+    description: "Convert Primary(IDENT token) to VarRef"
+    pattern:
+      node_kind: "Primary"
+      fields:
+        variant: { exists: true, is_token: true }
+    replacement:
+      nf_node: "VarRef"
+      nf_fields:
+        name: { from: "token:variant" }
+    constraints: []
+    notes:
+      - "When Primary wraps a bare identifier, produce VarRef for lowering"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # EMPTY / NULL PASS-THROUGH
+  # ═══════════════════════════════════════════════════════════════════════
+
+  normalize_empty:
+    description: "Pass through Empty node (empty param list, etc.) as identity"
+    pattern:
+      node_kind: "Empty"
+      fields: {}
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}
+    constraints: []
+    notes:
+      - "Empty arises from empty ParamList in fn main() — treated as no-op"
+
+  normalize_param_list:
+    description: "Pass through ParamList — discarded by transparent FnDecl rule"
+    pattern:
+      node_kind: "ParamList"
+      fields:
+        params: { exists: true, is_list: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}
+    constraints: []
+
+  normalize_param_rest:
+    description: "Pass through ParamRest — discarded by parent rules"
+    pattern:
+      node_kind: "ParamRest"
+      fields:
+        param: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}
+    constraints: []
+
+  normalize_param:
+    description: "Pass through Param — discarded by parent rules"
+    pattern:
+      node_kind: "Param"
+      fields:
+        name: { exists: true, is_token: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}
+    constraints: []
+
+  normalize_arg_list:
+    description: "Pass through ArgList — discarded by parent call rules"
+    pattern:
+      node_kind: "ArgList"
+      fields:
+        args: { exists: true, is_list: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}
+    constraints: []
+
+  normalize_arg_list_rest:
+    description: "Pass through ArgListRest"
+    pattern:
+      node_kind: "ArgListRest"
+      fields:
+        arg: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}
+    constraints: []
+
+  normalize_call_suffix:
+    description: "Pass through CallSuffix"
+    pattern:
+      node_kind: "CallSuffix"
+      fields:
+        args: { exists: true, is_node: true }
+    replacement:
+      nf_node: "identity"
+      nf_fields: {}
+    constraints: []
+
   # ═══════════════════════════════════════════════════════════════════════
   # IDENTITY RULES (NF-compliant nodes)
   # ═══════════════════════════════════════════════════════════════════════
 
-  identity_literals:
-    description: "Pass through literal nodes"
+  identity_typed_literals:
+    description: "Pass through typed literal constructor nodes"
     pattern:
       node_kind_matches:
         - "IntLit"
+        - "FloatLit"
+        - "DecimalLit"
+        - "TextLit"
         - "BoolLit"
         - "UnitLit"
-        - "StringLit"
+    replacement:
+      nf_node: "identity"
+      nf_fields: "preserve_all"
+    constraints: []
+
+  identity_constructors:
+    description: "Pass through Value/List constructor nodes"
+    pattern:
+      node_kind_matches:
+        - "ValueConstructExpr"
+        - "ListConstructExpr"
     replacement:
       nf_node: "identity"
       nf_fields: "preserve_all"

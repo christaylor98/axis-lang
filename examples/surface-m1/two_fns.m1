@@ -1,0 +1,13 @@
+// Two-function M1 program used to generate tests/coreir/two_fns.bin.
+//
+// identity: trivial return — lowers to CVar("x") + CLam{param:"x", body:Node(0)}
+// negate:   if/else with bool literals — lowers to CVar("flag") + Pool(false) +
+//           Pool(true) + CIf + CLam
+
+fn identity(x: Bool) -> Bool {
+  x
+}
+
+fn negate(flag: Bool) -> Bool {
+  if flag { Bool(false) } else { Bool(true) }
+}

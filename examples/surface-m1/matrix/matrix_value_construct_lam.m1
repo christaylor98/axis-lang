@@ -1,0 +1,6 @@
+// Matrix fixture: LamExpr as a Value element (G4 — Escape 2)
+// A Lam in a Value/ValueList arg is NOT in a direct CallExpr argument position.
+// RULE 2 (argument-position-only) rejects this at validation.
+fn f(x: Bool) -> Value(Bool) {
+  Value(Bool)(fn(a) { a })
+}

@@ -1,0 +1,4 @@
+// AI3 fixture: Unit literal tail.
+fn f() -> Unit {
+  return Unit();
+}
