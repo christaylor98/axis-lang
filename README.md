@@ -1,6 +1,6 @@
 # Axis Lang
 
-**A compiler construction laboratory for the Axis programming language.**
+**The compiler for the Axis programming language.**
 
 Axis Lang is a deterministic, spec-driven compiler pipeline that transforms Axis source code into canonical Core IR bundles. It serves as a testbed for semantic design decisions and provides a reference implementation for how surface language constructs are given meaning through mechanical lowering.
 
@@ -16,7 +16,7 @@ Axis Lang converts Axis source code through a multi-stage pipeline:
 4. **Normalisation** — converts surface AST into Normal Form (NF), removing surface sugar
 5. **Mechanical Lowering** — assigns semantics by transforming NF AST into Core IR (fixed, embedded, 100% Rust code)
 
-Language Lab **stops at Core IR**. Execution, code generation, and other backends are handled by optional **bridges** that consume Core IR.
+Axis Lang **stops at Core IR**. Execution, code generation, and other backends are handled by optional **bridges** that consume Core IR.
 
 The system is **deterministic**: the same source and specifications always produce identical Core IR. This ensures reproducibility and enables sealed builds where all specifications are embedded at compile time.
 
@@ -37,7 +37,7 @@ Axis Lang explicitly does **not** provide:
 - Concurrency or async execution
 - Dynamic language features
 
-These are intentionally out of scope. Language Lab is a **frontend only** — it stops at Core IR. The lab focuses exclusively on semantic authority and canonical lowering behavior.
+These are intentionally out of scope. Axis Lang is a **frontend only** — it stops at Core IR. Axis Lang focuses exclusively on semantic authority and canonical lowering behavior.
 
 ---
 
@@ -59,7 +59,7 @@ What is experimental:
 - Performance is not optimized
 - The API surface may change
 
-This is a laboratory, not a production tool.
+This is an experimental compiler, not a production tool.
 
 ---
 
@@ -93,7 +93,7 @@ cargo build --release
 # Output: Core IR structure (YAML)
 ```
 
-This runs the complete Language Lab pipeline from source to Core IR emission, using specification files that define the language syntax and lowering semantics.
+This runs the complete Axis Lang pipeline from source to Core IR emission, using specification files that define the language syntax and lowering semantics.
 
 ---
 
@@ -154,7 +154,7 @@ Lowering:
 
 Lowering is the **sole semantic authority**. Before lowering, programs have structure but no meaning. After lowering, semantics are frozen in Core IR.
 
-**Language Lab stops here.** Core IR is the output boundary.
+**Axis Lang stops here.** Core IR is the output boundary.
 
 ---
 
@@ -281,7 +281,7 @@ See the User Guide for details on when to use sealed vs. unsealed builds.
 
 ## Contributing
 
-This is a working laboratory. Code is structured for clarity and correctness, not performance.
+This is a working compiler. Code is structured for clarity and correctness, not performance.
 
 If you find behavior that violates the stated contracts or produces non-deterministic results, please open an issue with:
 - The exact command you ran

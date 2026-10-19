@@ -139,7 +139,7 @@ This keeps the pipeline predictable and debuggable.
 
 ## 7. Common Hook Stages
 
-The following hook stages are commonly useful and are supported conceptually by Language Lab.
+The following hook stages are commonly useful and are supported conceptually by Axis Lang.
 
 These are **guidelines**, not guarantees.
 

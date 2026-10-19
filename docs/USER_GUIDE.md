@@ -217,7 +217,7 @@ Core IR is:
 - **Self-contained:** Contains all information needed for semantic interpretation
 - **Deterministic:** Same input always produces identical Core IR
 - **Immutable:** Once produced, Core IR never changes
-- **The output boundary:** Language Lab stops here
+- **The output boundary:** Axis Lang stops here
 
 **What it is NOT:**
 
@@ -586,7 +586,7 @@ match core_term {
 
 - Bridges MAY read annotations
 - Bridges MAY use annotations to guide code generation, optimization, or other behavior
-- Language Lab itself does NOT interpret annotations semantically
+- Axis Lang itself does NOT interpret annotations semantically
 
 Annotations are a **contract between the language author and bridge authors**, not part of Core IR semantics.
 

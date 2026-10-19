@@ -4,7 +4,7 @@
 
 **Axis Lang** is a compiler frontend whose sole responsibility is to transform **surface language source text** into **canonical Core IR**.
 
-Language Lab:
+Axis Lang:
 
 * **does** produce Core IR
 * **does not** execute programs
@@ -13,7 +13,7 @@ Language Lab:
 * **does not** define or invoke bridges
 * **does not** execute registry functions
 
-The **only output boundary** of Language Lab is **Core IR**.
+The **only output boundary** of Axis Lang is **Core IR**.
 
 Everything beyond Core IR is **explicitly out of scope**.
 
@@ -432,7 +432,7 @@ This is intentional and foundational.
 * Target-agnostic
 * Versioned and stable
 
-Language Lab treats Core IR as:
+Axis Lang treats Core IR as:
 
 > The final, authoritative representation of program meaning.
 
@@ -454,7 +454,7 @@ All higher-level constructs are eliminated before Core IR emission.
 
 **Note**: Compiler hooks are **implementation-level guidelines** not specified in the Input Specification Contracts (AXIS_INPUT_SPECIFICATION_CONTRACTS-0.2.md). Hooks do not alter semantic authority or contractual obligations. See `AXIS_COMPILER_HOOKS_AND_PLUGINS_SPECIFICATION_0.1.md` for details.
 
-Language Lab exposes **compiler hook points** as **guidelines**, not enforcement mechanisms.
+Axis Lang exposes **compiler hook points** as **guidelines**, not enforcement mechanisms.
 
 Hooks exist to enable:
 
@@ -514,7 +514,7 @@ Bridges:
 
 Bridges:
 
-* do not participate in Language Lab
+* do not participate in Axis Lang
 * do not influence lowering
 * do not affect surface semantics
 
@@ -547,7 +547,7 @@ Lowering is intentionally embedded to preserve semantic stability.
 
 ## 10. Sealed vs Unsealed Builds
 
-Language Lab supports two deployment modes:
+Axis Lang supports two deployment modes:
 
 **Sealed builds** embed all user specifications (`lexer.yaml`, `parsing.yaml`, `ast_schema.yaml`, `normalisation.yaml`) at compile time, producing a self-contained, deterministic compiler binary.
 
@@ -579,7 +579,7 @@ These invariants must not be broken:
 
 ## 12. Naming Clarification
 
-Within Language Lab, the terms:
+Within Axis Lang, the terms:
 
 * **"Backend"** or **"IR-Lowering Backend"** or **"Mechanical Lowering"** refer **only** to:
   > **Mechanical Lowering (NF AST → Core IR 0.2)**

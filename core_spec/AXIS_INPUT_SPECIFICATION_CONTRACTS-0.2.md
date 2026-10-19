@@ -11,8 +11,8 @@ This document defines all **user-supplied input files** required by the Axis Lan
 A *user input* is a file that:
 
 * Defines lexical structure, syntactic grammar, AST schema, **normalisation rules**, or semantic lowering rules
-* Is consumed by Language Lab to produce Core IR from source code
-* Is not produced by Language Lab itself
+* Is consumed by Axis Lang to produce Core IR from source code
+* Is not produced by Axis Lang itself
 
 ### User inputs are:
 

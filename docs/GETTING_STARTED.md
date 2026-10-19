@@ -136,7 +136,7 @@ This is the simplest valid Axis program: a unit literal.
 
 ## Step 4: Compile to Core IR
 
-Run the complete Language Lab pipeline:
+Run the complete Axis Lang pipeline:
 
 ```bash
 ./target/release/axis run \
@@ -156,9 +156,9 @@ Run the complete Language Lab pipeline:
 3. **Schema projection** converted parse tree to typed AST: `UnitLit`
 4. **Normalisation** confirmed AST is already in Normal Form (no sugar to remove)
 5. **Mechanical Lowering** transformed `UnitLit` NF node to Core IR: `CUnitLit`
-6. **Output** — Core IR bundle emitted (Language Lab stops here)
+6. **Output** — Core IR bundle emitted (Axis Lang stops here)
 
-**Language Lab has no execution stage.** Bridges (out of scope) may consume Core IR for execution, code generation, or other purposes.
+**Axis Lang has no execution stage.** Bridges (out of scope) may consume Core IR for execution, code generation, or other purposes.
 
 ---
 
@@ -181,7 +181,7 @@ None of these stages assign meaning. They only recognize and transform structure
 
 Mechanical Lowering is **fixed and embedded** in the compiler (100% Rust code). It is the sole semantic authority.
 
-**Language Lab stops at Core IR.** There is no execution stage in Language Lab.
+**Axis Lang stops at Core IR.** There is no execution stage in Axis Lang.
 
 ---
 
@@ -465,9 +465,9 @@ To see the emitted Core IR:
 
 This shows the exact Core IR produced by mechanical lowering.
 
-### Language Lab Output Boundary
+### Axis Lang Output Boundary
 
-Language Lab stops at Core IR emission. There is no built-in execution, validation, or code generation in Language Lab.
+Axis Lang stops at Core IR emission. There is no built-in execution, validation, or code generation in Axis Lang.
 
 Bridges (out of scope) may consume Core IR for various purposes.
 
@@ -477,7 +477,7 @@ Bridges (out of scope) may consume Core IR for various purposes.
 
 You've successfully:
 - ✅ Built the compiler
-- ✅ Run the complete Language Lab pipeline
+- ✅ Run the complete Axis Lang pipeline
 - ✅ Modified a program and observed deterministic Core IR output
 - ✅ Understood the role of each specification file
 
